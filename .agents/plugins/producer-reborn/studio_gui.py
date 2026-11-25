@@ -1,16 +1,16 @@
 """
-Producer Reborn Studio — Zero-CMD Local Web GUI
-A Vibe-First, DAW-style visual dashboard for independent artists and beatmakers.
-Zero external web dependencies (uses Python standard library http.server).
+Producer Reborn Studio — Anti-Slop Minimal Local Web GUI
+A tactile, hardware-inspired DAW companion for by-ear producers ($0 Budget, Zero-CMD).
+Uses Python standard library http.server + browser Web Audio API synthesis.
 """
 
 import os
 import sys
 import json
 import time
-import shutil
 import socket
 import argparse
+import importlib.util
 import webbrowser
 import subprocess
 from pathlib import Path
@@ -18,7 +18,6 @@ from urllib.parse import urlparse, parse_qs, unquote
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 PLUGIN_DIR = Path(__file__).resolve().parent
-# Workspace root is 3 levels up from .agents/plugins/producer-reborn/
 WORKSPACE_ROOT = PLUGIN_DIR.parent.parent.parent
 UPLOADS_DIR = WORKSPACE_ROOT / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -47,6 +46,11 @@ def resolve_python() -> str:
 
 
 PYTHON_BIN = resolve_python()
+
+# Import generate_pattern in-process for sub-5ms chord voicing previews
+_gp_spec = importlib.util.spec_from_file_location("generate_pattern", str(SCRIPTS["generate_pattern"]))
+_gp_mod = importlib.util.module_from_spec(_gp_spec)
+_gp_spec.loader.exec_module(_gp_mod)
 
 
 def safe_filename(name: str) -> str:
@@ -88,343 +92,1235 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Producer Reborn Studio</title>
+  <title>Producer Reborn / Studio</title>
   <style>
     :root {
-      --bg: #0e1015;
-      --panel: #161922;
-      --panel-2: #1d212d;
-      --border: #2a3040;
-      --text: #eef1f7;
-      --muted: #939db4;
-      --accent: #7c5cff;
-      --accent-2: #19d3a2;
-      --warn: #f5b942;
-      --err: #ff5c7a;
+      --bg: #0b0d11;
+      --surface: #12151c;
+      --surface-2: #181c26;
+      --border: #242936;
+      --border-hi: #343b4e;
+      --text: #eef1f6;
+      --muted: #8b93a7;
+      --stark: #f4f6fb;
+      --stark-fg: #0b0d11;
+      --mint: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+      --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-      background: radial-gradient(circle at top right, #1a1630 0%, var(--bg) 55%);
+      font-family: var(--sans);
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+      line-height: 1.45;
     }
-    header {
+
+    /* Top Nav */
+    .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 18px 28px;
+      padding: 12px 24px;
       border-bottom: 1px solid var(--border);
-      background: rgba(14, 16, 21, 0.85);
-      backdrop-filter: blur(10px);
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      background: var(--surface);
+      gap: 16px;
+      flex-wrap: wrap;
     }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .brand-badge {
-      width: 38px; height: 38px; border-radius: 10px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      display: grid; place-items: center; font-size: 20px; font-weight: 700;
+    .brand {
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .brand h1 { margin: 0; font-size: 18px; letter-spacing: 0.2px; }
-    .brand p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
-    .pill {
-      font-size: 12px; padding: 6px 12px; border-radius: 999px;
-      background: var(--panel-2); border: 1px solid var(--border); color: var(--accent-2);
+    .brand span.sep { color: var(--muted); }
+    .brand span.sub { color: var(--muted); font-weight: 400; }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg);
+      padding: 3px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      flex-wrap: wrap;
     }
-    .container { max-width: 1080px; margin: 24px auto; padding: 0 20px 48px; }
-    .tabs {
-      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px;
+    .nav-tab {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: var(--sans);
     }
-    .tab-btn {
-      background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-      padding: 10px 16px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600;
-      transition: all 0.15s ease;
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active {
+      background: var(--surface-2);
+      color: var(--stark);
+      border: 1px solid var(--border-hi);
     }
-    .tab-btn:hover { color: var(--text); border-color: #3d465e; }
-    .tab-btn.active {
-      background: linear-gradient(135deg, rgba(124,92,255,0.22), rgba(25,211,162,0.12));
-      border-color: var(--accent); color: var(--text);
+
+    .telemetry-badge {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: var(--mint);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .card {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 14px; padding: 22px; margin-bottom: 18px;
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); display: inline-block; }
+
+    /* Container */
+    .main {
+      max-width: 1280px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 24px 36px;
+      flex: 1;
     }
-    .card h2 { margin: 0 0 6px; font-size: 18px; }
-    .card .sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
-    .panel-tab { display: none; }
-    .panel-tab.active { display: block; }
-    .vibe-grid {
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;
-      margin-bottom: 18px;
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+
+    /* Panels */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 14px;
     }
-    .vibe-card {
-      background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; cursor: pointer; transition: 0.15s;
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    .vibe-card:hover { border-color: #4b5575; }
-    .vibe-card.selected {
-      border-color: var(--accent-2);
-      background: rgba(25, 211, 162, 0.08);
+    .panel-title {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
-    .vibe-card .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-    .vibe-card .desc { font-size: 12px; color: var(--muted); }
-    .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 16px; }
-    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 600; }
-    select, input[type="text"], input[type="date"], input[type="number"] {
-      width: 100%; background: var(--panel-2); border: 1px solid var(--border);
-      color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 14px;
+    .panel-meta {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
     }
-    input[type="range"] { width: 100%; accent-color: var(--accent); }
-    .dropzone {
-      border: 2px dashed var(--border); border-radius: 12px; padding: 18px;
-      text-align: center; background: var(--panel-2); cursor: pointer; transition: 0.15s;
+
+    /* Mode Switcher */
+    .seg-group {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px;
+      gap: 2px;
     }
-    .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: rgba(124,92,255,0.08); }
-    .dropzone input { display: none; }
-    .dropzone .file-name { margin-top: 6px; font-size: 13px; color: var(--accent-2); font-weight: 600; }
-    .btn {
-      background: linear-gradient(135deg, var(--accent), #5d42e0);
-      color: #fff; border: none; border-radius: 10px; padding: 12px 20px;
-      font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+    .seg-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      padding: 4px 10px;
+      font-size: 11px;
+      font-family: var(--mono);
+      border-radius: 3px;
+      cursor: pointer;
     }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .seg-btn:hover { color: var(--text); }
+    .seg-btn.active {
+      background: var(--stark);
+      color: var(--stark-fg);
+      font-weight: 600;
+    }
+
+    /* Vibe Preset Strip */
+    .preset-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .preset-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 7px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.1s ease;
+    }
+    .preset-btn:hover { color: var(--text); border-color: var(--border-hi); }
+    .preset-btn.active {
+      background: var(--stark);
+      color: var(--stark-fg);
+      border-color: var(--stark);
+      font-weight: 600;
+    }
+
+    /* Custom Chords Input Row */
+    .custom-row {
+      display: none;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+    .custom-row.active { display: flex; }
+    .input-mono {
+      flex: 1;
+      min-width: 240px;
+      background: var(--bg);
+      border: 1px solid var(--border-hi);
+      color: var(--stark);
+      font-family: var(--mono);
+      font-size: 13px;
+      padding: 8px 12px;
+      border-radius: 4px;
+    }
+    .input-mono:focus { outline: none; border-color: var(--stark); }
+    .helper-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+    .chip-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .chip-btn:hover { color: var(--text); border-color: var(--border-hi); }
+
+    /* Controls Bar */
+    .controls-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .ctrl-block { display: flex; flex-direction: column; gap: 6px; }
+    .ctrl-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+    .stepper {
+      display: inline-flex;
+      align-items: center;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      height: 30px;
+    }
+    .stepper button {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      width: 28px;
+      height: 100%;
+      cursor: pointer;
+      font-family: var(--mono);
+      font-size: 14px;
+    }
+    .stepper button:hover { background: var(--surface-2); }
+    .stepper span {
+      min-width: 32px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+    select.ctrl-select, input.ctrl-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      height: 30px;
+      padding: 0 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: var(--sans);
+    }
+    .tempo-wrap { display: flex; align-items: center; gap: 10px; height: 30px; }
+    input[type="range"] { accent-color: var(--stark); cursor: pointer; }
+    .tempo-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      min-width: 68px;
+    }
+
+    /* Buttons */
+    .btn-primary {
+      background: var(--stark);
+      color: var(--stark-fg);
+      border: 1px solid var(--stark);
+      padding: 8px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+    .btn-primary:hover { opacity: 0.92; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
     .btn-secondary {
-      background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
-    .output-box {
-      background: #090b0f; border: 1px solid var(--border); border-radius: 10px;
-      padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; color: #d5dce9;
-      max-height: 360px; overflow-y: auto; margin-top: 14px; display: none;
+    .btn-secondary:hover { border-color: var(--border-hi); }
+
+    /* 2-Column Workspace */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.85fr) minmax(300px, 1fr);
+      gap: 14px;
     }
-    .downloads { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-    .dl-link {
-      text-decoration: none; background: rgba(25, 211, 162, 0.14);
-      border: 1px solid var(--accent-2); color: var(--accent-2);
-      padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    @media (max-width: 920px) {
+      .workspace-grid { grid-template-columns: 1fr; }
     }
-    .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 10px 0 16px; }
-    .checkbox-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+    /* 4-Bar Chord Strip */
+    .bars-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .bar-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+      cursor: pointer;
+      transition: border-color 0.1s;
+    }
+    .bar-card:hover { border-color: var(--border-hi); }
+    .bar-card.active { border-color: var(--stark); background: var(--surface-2); }
+    .bar-card.playing { border-color: var(--mint); }
+    .bar-top {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .bar-chord { font-size: 15px; font-weight: 600; color: var(--stark); margin-bottom: 4px; }
+    .bar-notes { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+    /* Harmonic Piano Roll Canvas */
+    .pianoroll-wrap {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px;
+      overflow-x: auto;
+    }
+    .pianoroll-grid {
+      display: grid;
+      gap: 4px;
+      min-height: 156px;
+    }
+    .pr-note {
+      background: #272d3d;
+      border: 1px solid #3c445c;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pr-note.accent {
+      background: var(--stark);
+      color: var(--stark-fg);
+      border-color: var(--stark);
+      font-weight: 600;
+    }
+
+    /* Step Sequencer Grid */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 5px;
+      margin-top: 10px;
+    }
+    .step-cell {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 4px;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+    }
+    .step-cell.hit {
+      background: var(--surface-2);
+      border-color: var(--border-hi);
+      color: var(--text);
+    }
+    .step-cell.accent {
+      background: var(--stark);
+      border-color: var(--stark);
+      color: var(--stark-fg);
+      font-weight: 700;
+    }
+
+    /* Mini Piano Keyboard */
+    .kbd-wrap {
+      display: flex;
+      position: relative;
+      height: 84px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px;
+      user-select: none;
+      margin-bottom: 8px;
+    }
+    .key-white {
+      flex: 1;
+      background: #1d222e;
+      border: 1px solid #2b3142;
+      border-radius: 0 0 3px 3px;
+      margin: 0 1px;
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 4px;
+      font-family: var(--mono);
+      font-size: 9px;
+      color: var(--muted);
+    }
+    .key-white.active {
+      background: var(--stark);
+      color: var(--stark-fg);
+      font-weight: 700;
+    }
+    .key-black {
+      width: 62%;
+      height: 54%;
+      background: #090b0f;
+      border: 1px solid #2b3142;
+      border-radius: 0 0 3px 3px;
+      position: absolute;
+      top: 0;
+      right: -32%;
+      z-index: 2;
+      cursor: pointer;
+    }
+    .key-black.active {
+      background: var(--mint);
+      border-color: var(--mint);
+    }
+
+    /* Suggestion Rows */
+    .suggest-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+    .suggest-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .suggest-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--mint);
+    }
+    .suggest-desc { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+
+    /* Dropzones & Outputs for Tools Tabs */
+    .dropzone {
+      border: 1px dashed var(--border-hi);
+      border-radius: 4px;
+      padding: 16px;
+      text-align: center;
+      background: var(--bg);
+      cursor: pointer;
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--stark); background: var(--surface-2); }
+    .dropzone input { display: none; }
+    .dropzone .fname { font-family: var(--mono); font-size: 11px; color: var(--mint); margin-top: 6px; }
+    .console-out {
+      background: #08090c;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      color: #d4dae6;
+      max-height: 360px;
+      overflow-y: auto;
+      margin-top: 12px;
+      display: none;
+    }
+    .dl-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
-  <header>
+
+  <header class="topbar">
     <div class="brand">
-      <div class="brand-badge">🎹</div>
-      <div>
-        <h1>Producer Reborn Studio</h1>
-        <p>Zero-Theory, Zero-CMD Music Production &amp; Release Suite ($0 Budget)</p>
-      </div>
+      <span>Producer Reborn</span>
+      <span class="sep">/</span>
+      <span class="sub">Studio</span>
     </div>
-    <div class="pill">Local • Offline-First • 100% Free</div>
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('vibe', this)">Vibe-to-MIDI</button>
+      <button class="nav-tab" onclick="switchTab('song', this)">Song Doctor</button>
+      <button class="nav-tab" onclick="switchTab('mix', this)">Mix Doctor</button>
+      <button class="nav-tab" onclick="switchTab('master', this)">AI Mastering</button>
+      <button class="nav-tab" onclick="switchTab('release', this)">RouteNote</button>
+    </nav>
+    <div class="telemetry-badge">
+      <span class="dot"></span>
+      <span id="hdr-telemetry">130.0 BPM • 4/4</span>
+    </div>
   </header>
 
-  <div class="container">
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('vibe', this)">🎹 1. Vibe-to-MIDI</button>
-      <button class="tab-btn" onclick="switchTab('analyze', this)">🎧 2. Song &amp; Stem Doctor</button>
-      <button class="tab-btn" onclick="switchTab('mix', this)">🩺 3. Mix Doctor</button>
-      <button class="tab-btn" onclick="switchTab('master', this)">🎚️ 4. AI Mastering</button>
-      <button class="tab-btn" onclick="switchTab('release', this)">🚀 5. RouteNote &amp; Timeline</button>
-    </div>
+  <main class="main">
 
-    <!-- TAB 1: VIBE TO MIDI -->
-    <div id="tab-vibe" class="panel-tab active">
-      <div class="card">
-        <h2>Vibe-to-MIDI Generator (No Music Theory Needed)</h2>
-        <p class="sub">Pick a mood, dial in your tempo, and export smooth voice-led chords + bass + groove ready to drag into your DAW.</p>
-
-        <label>1. Choose Your Mood / Vibe</label>
-        <div class="vibe-grid" id="vibe-grid">
-          <div class="vibe-card selected" data-preset="heartbreak" onclick="selectVibe(this)">
-            <div class="title">💔 Heartbreak Nostalgia</div>
-            <div class="desc">Warm, bittersweet major-to-minor lift</div>
-          </div>
-          <div class="vibe-card" data-preset="late-night" onclick="selectVibe(this)">
-            <div class="title">🌙 Late Night Sadboy</div>
-            <div class="desc">Lush R&amp;B / bedroom-pop 9th chords</div>
-          </div>
-          <div class="vibe-card" data-preset="dreamy-bedroom" onclick="selectVibe(this)">
-            <div class="title">☁️ Dreamy Bedroom Pop</div>
-            <div class="desc">Floating lo-fi keys, gentle resolution</div>
-          </div>
-          <div class="vibe-card" data-preset="dark-trap" onclick="selectVibe(this)">
-            <div class="title">🔥 Dark Emo Trap</div>
-            <div class="desc">Moody minor progression with tension</div>
-          </div>
-          <div class="vibe-card" data-preset="uplifting-indie" onclick="selectVibe(this)">
-            <div class="title">☀️ Uplifting Indie Pop</div>
-            <div class="desc">Bright, anthemic chorus energy</div>
-          </div>
-          <div class="vibe-card" data-preset="cinematic" onclick="selectVibe(this)">
-            <div class="title">🎬 Cinematic Modal</div>
-            <div class="desc">Wide, dramatic, emotional swell</div>
+    <!-- ================= TAB 1: VIBE-TO-MIDI ================= -->
+    <section id="pane-vibe" class="tab-pane active">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Vibe &amp; Harmonic Profile</span>
+          <div class="seg-group">
+            <button class="seg-btn active" id="mode-btn-preset" onclick="setInputMode('preset')">Vibe Presets</button>
+            <button class="seg-btn" id="mode-btn-custom" onclick="setInputMode('custom')">✎ Custom Chords</button>
           </div>
         </div>
 
-        <div class="row">
-          <div>
-            <label>2. Tempo: <span id="bpm-val">125</span> BPM</label>
-            <input type="range" id="vibe-bpm" min="65" max="175" value="125" oninput="document.getElementById('bpm-val').innerText=this.value" />
-          </div>
-          <div>
-            <label>3. Bassline Feel</label>
-            <select id="vibe-bass">
-              <option value="syncopated">Chill Syncopated Bounce</option>
-              <option value="eighth">Driving 8th-Note Pulse</option>
-              <option value="walking">Melodic Walking Bass</option>
-              <option value="none">No Bassline</option>
-            </select>
-          </div>
-          <div>
-            <label>4. Percussion Groove</label>
-            <select id="vibe-groove">
-              <option value="">None (Chords + Bass only)</option>
-              <option value="5,16">Afrobeat / Amapiano Bounce</option>
-              <option value="3,8">Reggaeton / Tresillo Pulse</option>
-              <option value="5,8">Syncopated Indie Shaker</option>
-            </select>
+        <!-- Preset Pills -->
+        <div class="preset-strip" id="preset-strip">
+          <button class="preset-btn active" data-preset="heartbreak" data-chords="F#m9 - Dmaj7#11 - A/C# - Eadd9" onclick="pickPreset(this)">Heartbreak Nostalgia</button>
+          <button class="preset-btn" data-preset="late-night" data-chords="Dm9 - G13 - Cmaj9 - Am9" onclick="pickPreset(this)">Late Night Sadboy</button>
+          <button class="preset-btn" data-preset="dreamy-bedroom" data-chords="Fmaj7 - Em7 - Dm9 - Cmaj7" onclick="pickPreset(this)">Dreamy Bedroom</button>
+          <button class="preset-btn" data-preset="dark-trap" data-chords="D#m9 - C#sus2 - Bmaj7 - A#7" onclick="pickPreset(this)">Dark Emo Trap</button>
+          <button class="preset-btn" data-preset="bedroom-indie" data-chords="Emaj7 - C#m7 - G#m7 - Badd9" onclick="pickPreset(this)">Bedroom Indie</button>
+          <button class="preset-btn" data-preset="tokyo-drift" data-chords="Fm7 - Dbmaj7 - Bbm7 - C7alt" onclick="pickPreset(this)">Tokyo Drift</button>
+          <button class="preset-btn" data-preset="dark-ambient" data-chords="Cm9 - Abmaj7#11 - Fm11 - G7sus4" onclick="pickPreset(this)">Dark Ambient</button>
+          <button class="preset-btn" data-preset="uplifting-indie" data-chords="C - G - Am - F" onclick="pickPreset(this)">Uplifting Indie</button>
+        </div>
+
+        <!-- Custom Chords Input -->
+        <div class="custom-row" id="custom-row">
+          <input type="text" class="input-mono" id="custom-chords-input" value="F#m9 - Dmaj7#11 - A/C# - Eadd9" placeholder="Type any chords: e.g. Dm9 - G13 - Cmaj9 - Am9 or C - Cmaj7 - F - Fm6" onkeydown="if(event.key==='Enter') refreshPreview()" />
+          <button class="btn-primary" onclick="refreshPreview()">Apply Chords</button>
+          <div class="helper-chips">
+            <button class="chip-btn" onclick="appendChord('Fm6')" title="Sad minor iv">+ Fm6 (Sad iv)</button>
+            <button class="chip-btn" onclick="appendChord('Cmaj9')" title="Dreamy 9th">+ Cmaj9</button>
+            <button class="chip-btn" onclick="appendChord('Asus2')" title="Open suspended">+ Asus2</button>
           </div>
         </div>
 
-        <button class="btn" onclick="runVibeMidi(this)">✨ Generate Drag-and-Drop MIDI</button>
-        <div id="out-vibe" class="output-box"></div>
-        <div id="dl-vibe" class="downloads"></div>
+        <!-- Parameter Controls -->
+        <div class="controls-row">
+          <div class="ctrl-block">
+            <span class="ctrl-label">Octave</span>
+            <div class="stepper">
+              <button onclick="stepOctave(-1)">-</button>
+              <span id="octave-val">0</span>
+              <button onclick="stepOctave(1)">+</button>
+            </div>
+          </div>
+
+          <div class="ctrl-block">
+            <span class="ctrl-label">Time Signature</span>
+            <div class="seg-group" id="timesig-group">
+              <button class="seg-btn active" data-ts="4/4" onclick="pickTimeSig(this)">4/4</button>
+              <button class="seg-btn" data-ts="3/4" onclick="pickTimeSig(this)">3/4</button>
+              <button class="seg-btn" data-ts="6/8" onclick="pickTimeSig(this)">6/8</button>
+              <button class="seg-btn" data-ts="5/4" onclick="pickTimeSig(this)">5/4</button>
+              <button class="seg-btn" data-ts="7/4" onclick="pickTimeSig(this)">7/4</button>
+            </div>
+          </div>
+
+          <div class="ctrl-block">
+            <span class="ctrl-label">Tempo</span>
+            <div class="tempo-wrap">
+              <input type="range" id="bpm-slider" min="65" max="180" value="130" oninput="onTempoChange(this.value)" />
+              <span class="tempo-val" id="bpm-display">130.0 BPM</span>
+            </div>
+          </div>
+
+          <div class="ctrl-block">
+            <span class="ctrl-label">Preview Synth</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <select class="ctrl-select" id="synth-tone">
+                <option value="rhodes">Fender Rhodes Mk I</option>
+                <option value="pad">Warm Analog Pad</option>
+                <option value="pluck">Soft Keys Pluck</option>
+              </select>
+              <button class="btn-primary" id="play-btn" onclick="togglePlay()" style="height:30px; padding:0 12px;">▶ Play</button>
+              <button class="btn-secondary" onclick="stopPlayback()" style="height:30px; padding:0 10px;">■</button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- TAB 2: SONG & STEM DOCTOR -->
-    <div id="tab-analyze" class="panel-tab">
-      <div class="card">
-        <h2>Song &amp; Stem Doctor</h2>
-        <p class="sub">Drop a beat, loop, or full track to detect BPM, key, chords, and check if vocals or bass drift off-key.</p>
-        <div class="row">
-          <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'analyze-song')">
-            <div>🎵 Drop Full Track / Loop (MP3 or WAV)</div>
-            <div class="file-name" id="name-analyze-song">Click or drag file here</div>
-            <input type="file" accept="audio/*" onchange="uploadInput(this,'analyze-song')" />
+      <div class="workspace-grid">
+        <!-- LEFT COLUMN -->
+        <div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Harmonic Piano Roll</span>
+              <span class="panel-meta" id="pr-meta">4 Bars • 4/4 • Voice-Led</span>
+            </div>
+            <div class="bars-grid" id="bars-grid"></div>
+            <div class="pianoroll-wrap">
+              <div class="pianoroll-grid" id="pianoroll-grid"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Rhythm Pattern &amp; Velocity</span>
+              <span class="panel-meta" id="groove-meta">Swing: 18% • Humanize: ±10ms</span>
+            </div>
+            <div class="controls-row" style="border-top:none; padding-top:0; margin-bottom:8px;">
+              <div class="ctrl-block">
+                <span class="ctrl-label">Bassline Feel</span>
+                <select class="ctrl-select" id="bass-style" onchange="refreshPreview()">
+                  <option value="syncopated">Chill Syncopated</option>
+                  <option value="eighth">Driving 8th-Note Pulse</option>
+                  <option value="walking">Melodic Walking Bass</option>
+                  <option value="none">No Bassline</option>
+                </select>
+              </div>
+              <div class="ctrl-block">
+                <span class="ctrl-label">Percussion Groove</span>
+                <select class="ctrl-select" id="euclidean-groove" onchange="refreshPreview()">
+                  <option value="">None (Keys + Bass only)</option>
+                  <option value="5,16" selected>Afrobeat / Amapiano E(5,16)</option>
+                  <option value="3,8">Reggaeton / Tresillo E(3,8)</option>
+                  <option value="5,8">Syncopated Cinquillo E(5,8)</option>
+                </select>
+              </div>
+              <div class="ctrl-block">
+                <span class="ctrl-label">Swing (<span id="swing-val">18</span>%)</span>
+                <input type="range" id="swing-slider" min="0" max="45" value="18" oninput="document.getElementById('swing-val').innerText=this.value; updateGrooveMeta()" />
+              </div>
+              <div class="ctrl-block">
+                <span class="ctrl-label">Humanize (±<span id="hum-val">10</span>ms)</span>
+                <input type="range" id="hum-slider" min="0" max="25" value="10" oninput="document.getElementById('hum-val').innerText=this.value; updateGrooveMeta()" />
+              </div>
+            </div>
+            <div class="steps-grid" id="steps-grid"></div>
           </div>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn" onclick="runAnalyze('chords', this)">🎼 Extract BPM, Chords &amp; MIDI</button>
-          <button class="btn btn-secondary" onclick="runAnalyze('stems', this)">🎤 Audit Vocal &amp; Bass Pitch (Demucs + pYIN)</button>
-        </div>
-        <div id="out-analyze" class="output-box"></div>
-        <div id="dl-analyze" class="downloads"></div>
-      </div>
-    </div>
 
-    <!-- TAB 3: MIX DOCTOR -->
-    <div id="tab-mix" class="panel-tab">
-      <div class="card">
-        <h2>Mix Doctor (Pre-Mastering Check)</h2>
-        <p class="sub">Check headroom (-6 to -3 dBFS), stereo phase safety, mono bass (&lt; 120 Hz), and EQ balance vs. a reference track.</p>
-        <div class="row">
+        <!-- RIGHT COLUMN -->
+        <div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Export MIDI</span>
+              <span class="panel-meta" id="midi-meta">Standard Type-1</span>
+            </div>
+            <button class="btn-primary" style="width:100%; margin-bottom:8px; height:38px;" onclick="exportMidi(this)">⬇ Export .MID File</button>
+            <button class="btn-secondary" style="width:100%;" onclick="rerollInversion()">🎲 Reroll Voice-Leading Inversion</button>
+            <div id="midi-dl-bar" class="dl-bar"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Chord Suggestions</span>
+              <span class="panel-meta">Modal Borrow</span>
+            </div>
+            <div id="suggestions-list">
+              <div class="suggest-card">
+                <div class="suggest-top">
+                  <span>Fm6 (Borrowed Minor iv)</span>
+                  <span class="suggest-tag">Nostalgic Lift</span>
+                </div>
+                <div class="suggest-desc">Adds bittersweet emotional tension before looping back to Bar 1.</div>
+                <button class="btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="applySuggestion('Fm6')">Apply to Bar 4</button>
+              </div>
+              <div class="suggest-card">
+                <div class="suggest-top">
+                  <span>Bm7 (Dorian IV)</span>
+                  <span class="suggest-tag">Neo-Soul</span>
+                </div>
+                <div class="suggest-desc">Smooth natural-6th lift ideal for R&amp;B and bedroom-pop turnarounds.</div>
+                <button class="btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="applySuggestion('Bm7')">Apply to Bar 4</button>
+              </div>
+              <div class="suggest-card">
+                <div class="suggest-top">
+                  <span>C#7alt (Dominant)</span>
+                  <span class="suggest-tag">Resolution Pull</span>
+                </div>
+                <div class="suggest-desc">Strong dominant tension pulling back strongly to Bar 1.</div>
+                <button class="btn-secondary" style="padding:4px 10px; font-size:11px;" onclick="applySuggestion('C#7alt')">Apply to Bar 4</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Current Voicing</span>
+              <span class="panel-meta" id="voicing-chord-name">F#m9</span>
+            </div>
+            <div class="kbd-wrap" id="mini-kbd"></div>
+            <div class="panel-meta" id="voicing-notes-text">Notes: C#4 · E4 · F#4 · G#4 · A4</div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Algorithmic Provenance</span>
+            </div>
+            <div style="font-size:11.5px; color:var(--muted);">
+              Synthesized locally with mathematical voice-leading constraints. 100% royalty-free and safe for commercial streaming platforms.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: SONG & STEM DOCTOR ================= -->
+    <section id="pane-song" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Song &amp; Stem Pitch Doctor (Basic Pitch ONNX + Demucs + pYIN)</span>
+        </div>
+        <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'analyze-song')">
+          <div>Drop Full Track or Audio Loop (MP3 / WAV)</div>
+          <div class="fname" id="name-analyze-song">Click or drag file here</div>
+          <input type="file" accept="audio/*" onchange="uploadInput(this,'analyze-song')" />
+        </div>
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <button class="btn-primary" onclick="runAnalyze('chords', this)">Extract BPM, Chords &amp; MIDI</button>
+          <button class="btn-secondary" onclick="runAnalyze('stems', this)">Audit Vocal &amp; Bass Intonation (Cents)</button>
+        </div>
+        <pre id="out-analyze" class="console-out"></pre>
+        <div id="dl-analyze" class="dl-bar"></div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: MIX DOCTOR ================= -->
+    <section id="pane-mix" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Mix Doctor (Pre-Mastering Audit)</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:10px; margin-bottom:12px;">
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'mix-target')">
-            <div>🎚️ Drop Your Pre-Master Mix (WAV/FLAC/MP3)</div>
-            <div class="file-name" id="name-mix-target">Required</div>
+            <div>Drop Pre-Master Mix (WAV/FLAC/MP3)</div>
+            <div class="fname" id="name-mix-target">Required</div>
             <input type="file" accept="audio/*" onchange="uploadInput(this,'mix-target')" />
           </div>
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'mix-ref')">
-            <div>💿 Drop Commercial Reference Track (Optional)</div>
-            <div class="file-name" id="name-mix-ref">Optional</div>
+            <div>Drop Reference Track (Optional)</div>
+            <div class="fname" id="name-mix-ref">Optional</div>
             <input type="file" accept="audio/*" onchange="uploadInput(this,'mix-ref')" />
           </div>
         </div>
-        <button class="btn" onclick="runMixCheck(this)">🩺 Diagnose My Mix</button>
-        <div id="out-mix" class="output-box"></div>
+        <button class="btn-primary" onclick="runMixCheck(this)">Run Mix Diagnostic</button>
+        <pre id="out-mix" class="console-out"></pre>
       </div>
-    </div>
+    </section>
 
-    <!-- TAB 4: AI MASTERING -->
-    <div id="tab-master" class="panel-tab">
-      <div class="card">
-        <h2>AI Reference Mastering (Matchering 2.0.6)</h2>
-        <p class="sub">Match the loudness and tonal curve of any commercial track. Exports 24-bit WAV + 16-bit RouteNote-ready FLAC.</p>
-        <div class="row">
+    <!-- ================= TAB 4: AI MASTERING ================= -->
+    <section id="pane-master" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">AI Reference Mastering (Matchering 2.0.6 + EBU R128)</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:10px; margin-bottom:12px;">
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'master-target')">
-            <div>🎚️ Drop Your Mix (WAV/FLAC)</div>
-            <div class="file-name" id="name-master-target">Required</div>
+            <div>Drop Pre-Master Mix (WAV/FLAC)</div>
+            <div class="fname" id="name-master-target">Required</div>
             <input type="file" accept="audio/*" onchange="uploadInput(this,'master-target')" />
           </div>
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'master-ref')">
-            <div>💿 Drop Commercial Reference Track</div>
-            <div class="file-name" id="name-master-ref">Required</div>
+            <div>Drop Commercial Reference Track</div>
+            <div class="fname" id="name-master-ref">Required</div>
             <input type="file" accept="audio/*" onchange="uploadInput(this,'master-ref')" />
           </div>
         </div>
-        <button class="btn" onclick="runMaster(this)">🔥 Master Track Now</button>
-        <div id="out-master" class="output-box"></div>
-        <div id="dl-master" class="downloads"></div>
+        <button class="btn-primary" onclick="runMaster(this)">Master to 24-bit WAV + 16-bit FLAC</button>
+        <pre id="out-master" class="console-out"></pre>
+        <div id="dl-master" class="dl-bar"></div>
       </div>
-    </div>
+    </section>
 
-    <!-- TAB 5: ROUTENOTE & TIMELINE -->
-    <div id="tab-release" class="panel-tab">
-      <div class="card">
-        <h2>RouteNote Pre-Flight Validator &amp; Auto-Fix</h2>
-        <p class="sub">Automatically checks and converts audio to 16-bit 44.1 kHz FLAC and artwork to 3000×3000 RGB JPG.</p>
-        <div class="row">
+    <!-- ================= TAB 5: ROUTENOTE & TIMELINE ================= -->
+    <section id="pane-release" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">RouteNote Pre-Flight Validator &amp; Auto-Fix</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:10px; margin-bottom:12px;">
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'rn-audio')">
-            <div>🎵 Drop Master Audio (WAV/FLAC/MP3)</div>
-            <div class="file-name" id="name-rn-audio">Optional</div>
+            <div>Drop Master Audio (WAV/FLAC/MP3)</div>
+            <div class="fname" id="name-rn-audio">Optional</div>
             <input type="file" accept="audio/*" onchange="uploadInput(this,'rn-audio')" />
           </div>
           <div class="dropzone" onclick="this.querySelector('input').click()" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)" ondrop="dropFile(event,this,'rn-art')">
-            <div>🖼️ Drop Cover Artwork (PNG/JPG)</div>
-            <div class="file-name" id="name-rn-art">Optional</div>
+            <div>Drop Cover Artwork (PNG/JPG)</div>
+            <div class="fname" id="name-rn-art">Optional</div>
             <input type="file" accept="image/*" onchange="uploadInput(this,'rn-art')" />
           </div>
         </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="rn-fix" checked />
-          <label for="rn-fix" style="margin:0; cursor:pointer;">Auto-Fix issues (Convert to 16-bit FLAC &amp; Resize cover to 3000×3000 RGB JPG)</label>
-        </div>
-        <button class="btn" onclick="runValidate(this)">✅ Validate &amp; Auto-Fix Assets</button>
-        <div id="out-rn" class="output-box"></div>
-        <div id="dl-rn" class="downloads"></div>
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; cursor:pointer; font-size:12px;">
+          <input type="checkbox" id="rn-fix" checked /> Auto-Fix non-compliant files (Export 16-bit 44.1kHz FLAC &amp; 3000×3000 RGB JPG)
+        </label>
+        <button class="btn-primary" onclick="runValidate(this)">Validate &amp; Auto-Fix Assets</button>
+        <pre id="out-rn" class="console-out"></pre>
+        <div id="dl-rn" class="dl-bar"></div>
       </div>
 
-      <div class="card">
-        <h2>H-28 Release Countdown &amp; Calendar Export</h2>
-        <p class="sub">Generates your RouteNote submission, Spotify editorial pitch deadline (H-7), and `.ics` calendar file.</p>
-        <div class="row">
-          <div>
-            <label>Single / EP Title</label>
-            <input type="text" id="tl-title" placeholder="e.g., Midnight Drive" />
-          </div>
-          <div>
-            <label>Target Release Date</label>
-            <input type="date" id="tl-date" value="2026-12-31" />
-          </div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">H-28 Release Countdown &amp; Calendar Export</span>
         </div>
-        <button class="btn" onclick="runTimeline(this)">📅 Generate Release Calendar (.ics)</button>
-        <div id="out-tl" class="output-box"></div>
-        <div id="dl-tl" class="downloads"></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+          <input type="text" class="input-mono" id="tl-title" placeholder="Track or EP Title" style="max-width:320px;" />
+          <input type="date" class="ctrl-input" id="tl-date" value="2026-12-31" />
+          <button class="btn-primary" onclick="runTimeline(this)">Generate .ICS Calendar</button>
+        </div>
+        <pre id="out-tl" class="console-out"></pre>
+        <div id="dl-tl" class="dl-bar"></div>
       </div>
-    </div>
-  </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <span>Audio: Local Python + Basic Pitch ONNX + Matchering 2.0.6</span>
+    <span>Producer Reborn</span>
+  </footer>
 
 <script>
-const uploadedPaths = {};
-let selectedPreset = "heartbreak";
+const state = {
+  inputMode: "preset",
+  preset: "heartbreak",
+  customChords: "F#m9 - Dmaj7#11 - A/C# - Eadd9",
+  octave: 0,
+  timeSignature: "4/4",
+  bpm: 130,
+  reroll: 0,
+  selectedBarIdx: 0,
+  barsData: [],
+  uploaded: {}
+};
 
+// Web Audio API Synth
+let audioCtx = null;
+let isPlaying = false;
+let playTimer = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+function playTone(midiNote, startTime, duration) {
+  ensureAudioCtx();
+  const mode = document.getElementById('synth-tone').value;
+  const freq = midiToFreq(midiNote);
+
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  if (mode === 'pad') {
+    osc1.type = 'sawtooth';
+    osc2.type = 'triangle';
+    osc2.detune.value = 6;
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+    gain.gain.setValueAtTime(0.001, startTime);
+    gain.gain.linearRampToValueAtTime(0.06, startTime + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  } else if (mode === 'pluck') {
+    osc1.type = 'triangle';
+    osc2.type = 'sine';
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(3200, startTime);
+    filter.frequency.exponentialRampToValueAtTime(500, startTime + 0.4);
+    gain.gain.setValueAtTime(0.001, startTime);
+    gain.gain.linearRampToValueAtTime(0.11, startTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + Math.min(duration, 0.9));
+  } else {
+    // Fender Rhodes style bell + warm fundamental
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    osc2.detune.value = 3.5;
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(2000, startTime);
+    filter.frequency.exponentialRampToValueAtTime(700, startTime + 0.6);
+    gain.gain.setValueAtTime(0.001, startTime);
+    gain.gain.linearRampToValueAtTime(0.09, startTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+  }
+
+  osc1.frequency.setValueAtTime(freq, startTime);
+  osc2.frequency.setValueAtTime(freq, startTime);
+  osc1.connect(filter);
+  osc2.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  osc1.start(startTime);
+  osc2.start(startTime);
+  osc1.stop(startTime + duration + 0.05);
+  osc2.stop(startTime + duration + 0.05);
+}
+
+function playChord(pitches, duration = 1.2) {
+  ensureAudioCtx();
+  const now = audioCtx.currentTime;
+  pitches.forEach((p, idx) => playTone(p, now + idx * 0.012, duration));
+}
+
+function togglePlay() {
+  if (isPlaying) { stopPlayback(); return; }
+  if (!state.barsData.length) return;
+  ensureAudioCtx();
+  isPlaying = true;
+  document.getElementById('play-btn').innerText = "⏸ Playing";
+  let stepIdx = 0;
+
+  function scheduleNext() {
+    if (!isPlaying) return;
+    const bar = state.barsData[stepIdx % state.barsData.length];
+    state.selectedBarIdx = stepIdx % state.barsData.length;
+    renderBarsAndKeyboard(true);
+    const barSec = bar.duration_sec || 1.8;
+    playChord(bar.pitches, Math.max(0.5, barSec * 0.92));
+    stepIdx++;
+    playTimer = setTimeout(scheduleNext, barSec * 1000);
+  }
+  scheduleNext();
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  if (playTimer) clearTimeout(playTimer);
+  document.getElementById('play-btn').innerText = "▶ Play";
+  renderBarsAndKeyboard(false);
+}
+
+// Navigation & Controls
 function switchTab(id, btn) {
-  document.querySelectorAll('.panel-tab').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + id).classList.add('active');
   btn.classList.add('active');
 }
 
-function selectVibe(el) {
-  document.querySelectorAll('.vibe-card').forEach(c => c.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedPreset = el.dataset.preset;
+function setInputMode(mode) {
+  state.inputMode = mode;
+  document.getElementById('mode-btn-preset').classList.toggle('active', mode === 'preset');
+  document.getElementById('mode-btn-custom').classList.toggle('active', mode === 'custom');
+  document.getElementById('preset-strip').style.display = mode === 'preset' ? 'flex' : 'none';
+  document.getElementById('custom-row').classList.toggle('active', mode === 'custom');
+  refreshPreview();
 }
 
+function pickPreset(el) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.preset = el.dataset.preset;
+  state.customChords = el.dataset.chords;
+  document.getElementById('custom-chords-input').value = state.customChords;
+  state.reroll = 0;
+  refreshPreview();
+}
+
+function appendChord(chord) {
+  const inp = document.getElementById('custom-chords-input');
+  inp.value = inp.value.trim() ? inp.value.trim() + " - " + chord : chord;
+  refreshPreview();
+}
+
+function applySuggestion(chord) {
+  setInputMode('custom');
+  const inp = document.getElementById('custom-chords-input');
+  const tokens = inp.value.replace(/\|/g, ' ').replace(/,/g, ' ').split(/\s+-\s+|\s+/).filter(Boolean);
+  if (tokens.length >= 2) {
+    tokens[tokens.length - 1] = chord;
+    inp.value = tokens.join(' - ');
+  } else {
+    inp.value = chord;
+  }
+  refreshPreview();
+  setTimeout(() => {
+    if (state.barsData.length) {
+      state.selectedBarIdx = state.barsData.length - 1;
+      renderBarsAndKeyboard(false);
+      playChord(state.barsData[state.selectedBarIdx].pitches, 1.1);
+    }
+  }, 80);
+}
+
+function stepOctave(delta) {
+  state.octave = Math.max(-2, Math.min(2, state.octave + delta));
+  document.getElementById('octave-val').innerText = (state.octave > 0 ? "+" : "") + state.octave;
+  refreshPreview();
+}
+
+function pickTimeSig(el) {
+  document.querySelectorAll('#timesig-group .seg-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  state.timeSignature = el.dataset.ts;
+  updateTelemetry();
+  refreshPreview();
+}
+
+function onTempoChange(val) {
+  state.bpm = parseFloat(val);
+  document.getElementById('bpm-display').innerText = state.bpm.toFixed(1) + " BPM";
+  updateTelemetry();
+  refreshPreview();
+}
+
+function updateTelemetry() {
+  document.getElementById('hdr-telemetry').innerText = `${state.bpm.toFixed(1)} BPM • ${state.timeSignature}`;
+}
+
+function updateGrooveMeta() {
+  const sw = document.getElementById('swing-slider').value;
+  const hm = document.getElementById('hum-slider').value;
+  document.getElementById('groove-meta').innerText = `Swing: ${sw}% • Humanize: ±${hm}ms`;
+  renderStepsStrip();
+}
+
+function rerollInversion() {
+  state.reroll = (state.reroll + 1) % 8;
+  refreshPreview();
+}
+
+async function refreshPreview() {
+  const chordsVal = state.inputMode === 'custom'
+    ? document.getElementById('custom-chords-input').value
+    : "";
+  const res = await fetch('/api/preview_voicing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      preset: state.preset,
+      chords: chordsVal,
+      bpm: state.bpm,
+      time_signature: state.timeSignature,
+      octave_offset: state.octave,
+      reroll: state.reroll,
+      euclidean: document.getElementById('euclidean-groove').value
+    })
+  });
+  const data = await res.json();
+  if (data.ok) {
+    state.barsData = data.bars;
+    if (state.selectedBarIdx >= state.barsData.length) state.selectedBarIdx = 0;
+    document.getElementById('pr-meta').innerText = `${state.barsData.length} Bars • ${state.timeSignature} • Voice-Led`;
+    renderBarsAndKeyboard(false);
+    renderPianoRoll();
+    renderStepsStrip(data.euclidean_pattern);
+  }
+}
+
+function renderBarsAndKeyboard(isLoopPlaying) {
+  const grid = document.getElementById('bars-grid');
+  grid.innerHTML = '';
+  state.barsData.forEach((b, idx) => {
+    const div = document.createElement('div');
+    div.className = 'bar-card' + (idx === state.selectedBarIdx ? ' active' : '') + (isLoopPlaying && idx === state.selectedBarIdx ? ' playing' : '');
+    div.onclick = () => {
+      state.selectedBarIdx = idx;
+      renderBarsAndKeyboard(false);
+      playChord(b.pitches, 1.0);
+    };
+    div.innerHTML = `
+      <div class="bar-top"><span>Bar ${b.bar}</span><span>${b.duration_sec}s</span></div>
+      <div class="bar-chord">${b.symbol}</div>
+      <div class="bar-notes">${b.notes.join(' · ')}</div>
+    `;
+    grid.appendChild(div);
+  });
+
+  // Update Mini Piano Keyboard (C3=48 to B4=71)
+  const activeBar = state.barsData[state.selectedBarIdx];
+  const activePitches = new Set(activeBar ? activeBar.pitches : []);
+  document.getElementById('voicing-chord-name').innerText = activeBar ? activeBar.symbol : '-';
+  document.getElementById('voicing-notes-text').innerText = activeBar ? ("Notes: " + activeBar.notes.join(' · ')) : '';
+
+  const kbd = document.getElementById('mini-kbd');
+  kbd.innerHTML = '';
+  const whiteNotes = [0, 2, 4, 5, 7, 9, 11];
+  const hasBlack = { 0: 1, 2: 3, 5: 6, 7: 8, 9: 10 };
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+  for (let oct = 3; oct <= 4; oct++) {
+    whiteNotes.forEach(pc => {
+      const midi = 12 * (oct + 1) + pc;
+      const wKey = document.createElement('div');
+      wKey.className = 'key-white' + (activePitches.has(midi) ? ' active' : '');
+      wKey.innerText = names[pc] + oct;
+      wKey.onclick = (e) => { e.stopPropagation(); playTone(midi, ensureTime(), 0.7); };
+
+      if (hasBlack[pc] !== undefined) {
+        const bMidi = 12 * (oct + 1) + hasBlack[pc];
+        const bKey = document.createElement('div');
+        bKey.className = 'key-black' + (activePitches.has(bMidi) ? ' active' : '');
+        bKey.onclick = (e) => { e.stopPropagation(); playTone(bMidi, ensureTime(), 0.7); };
+        wKey.appendChild(bKey);
+      }
+      kbd.appendChild(wKey);
+    });
+  }
+}
+
+function ensureTime() { ensureAudioCtx(); return audioCtx.currentTime; }
+
+function renderPianoRoll() {
+  const pr = document.getElementById('pianoroll-grid');
+  pr.style.gridTemplateColumns = `repeat(${Math.max(1, state.barsData.length)}, 1fr)`;
+  pr.innerHTML = '';
+  state.barsData.forEach(b => {
+    const col = document.createElement('div');
+    col.style.display = 'flex';
+    col.style.flexDirection = 'column-reverse';
+    col.style.gap = '4px';
+    col.style.borderRight = '1px solid var(--border)';
+    col.style.paddingRight = '4px';
+    b.pitches.forEach((p, idx) => {
+      const n = document.createElement('div');
+      const isTop = idx === b.pitches.length - 1;
+      n.className = 'pr-note' + (isTop ? ' accent' : '');
+      n.innerHTML = `<span>${b.notes[idx]}</span><span>${idx === 0 ? 'Bass' : isTop ? 'Top' : 'Voice'}</span>`;
+      col.appendChild(n);
+    });
+    pr.appendChild(col);
+  });
+}
+
+function renderStepsStrip(pattern) {
+  const strip = document.getElementById('steps-grid');
+  const stepArr = pattern || [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0];
+  strip.style.gridTemplateColumns = `repeat(${Math.min(16, stepArr.length)}, 1fr)`;
+  strip.innerHTML = '';
+  stepArr.forEach((val, idx) => {
+    const cell = document.createElement('div');
+    const isDownbeat = idx === 0 || idx === Math.floor(stepArr.length / 2);
+    cell.className = 'step-cell' + (val ? (isDownbeat ? ' accent' : ' hit') : '');
+    cell.innerHTML = `<div>${String(idx + 1).padStart(2, '0')}</div><div>${val ? (isDownbeat ? '115' : '82') : '-'}</div>`;
+    strip.appendChild(cell);
+  });
+}
+
+async function exportMidi(btn) {
+  const chordsVal = state.inputMode === 'custom' ? document.getElementById('custom-chords-input').value : "";
+  const orig = btn.innerText;
+  btn.disabled = true; btn.innerText = "Generating...";
+  const res = await fetch('/api/run', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'vibe_midi',
+      params: {
+        preset: state.preset,
+        chords: chordsVal,
+        bpm: state.bpm,
+        time_signature: state.timeSignature,
+        octave_offset: state.octave,
+        reroll: state.reroll,
+        swing: document.getElementById('swing-slider').value,
+        humanize_ms: document.getElementById('hum-slider').value,
+        bass: document.getElementById('bass-style').value,
+        groove: document.getElementById('euclidean-groove').value
+      }
+    })
+  });
+  const data = await res.json();
+  btn.disabled = false; btn.innerText = orig;
+  const dl = document.getElementById('midi-dl-bar');
+  dl.innerHTML = '';
+  if (data.downloads && data.downloads.length) {
+    data.downloads.forEach(d => {
+      const a = document.createElement('a');
+      a.href = d.url; a.className = 'btn-primary';
+      a.style.width = '100%';
+      a.innerText = '⬇ Download ' + d.label;
+      dl.appendChild(a);
+    });
+    document.getElementById('midi-meta').innerText = 'Ready • ' + data.downloads[0].label;
+  }
+}
+
+// Generic Upload & Tool Runners
 function dragOver(e, el) { e.preventDefault(); el.classList.add('dragover'); }
 function dragLeave(el) { el.classList.remove('dragover'); }
 function dropFile(e, el, key) {
@@ -436,8 +1332,8 @@ function uploadInput(input, key) {
 }
 
 async function uploadFile(file, key) {
-  const label = document.getElementById('name-' + key);
-  label.innerText = "Uploading " + file.name + "...";
+  const lbl = document.getElementById('name-' + key);
+  lbl.innerText = "Uploading " + file.name + "...";
   const res = await fetch('/api/upload', {
     method: 'POST',
     headers: { 'X-Filename': encodeURIComponent(file.name) },
@@ -445,22 +1341,19 @@ async function uploadFile(file, key) {
   });
   const data = await res.json();
   if (data.path) {
-    uploadedPaths[key] = data.path;
-    label.innerText = "✅ " + data.name;
+    state.uploaded[key] = data.path;
+    lbl.innerText = "✓ " + data.name;
   } else {
-    label.innerText = "❌ Upload failed";
+    lbl.innerText = "Upload failed";
   }
 }
 
-async function callApi(action, params, btn, outId, dlId) {
-  const origText = btn.innerText;
-  btn.disabled = true;
-  btn.innerText = "⏳ Running...";
+async function runTool(action, params, btn, outId, dlId) {
+  const orig = btn.innerText;
+  btn.disabled = true; btn.innerText = "Running...";
   const out = document.getElementById(outId);
-  out.style.display = "block";
-  out.innerText = "Processing... please wait.";
+  out.style.display = "block"; out.innerText = "Processing locally...";
   if (dlId) document.getElementById(dlId).innerHTML = "";
-
   try {
     const res = await fetch('/api/run', {
       method: 'POST',
@@ -469,74 +1362,44 @@ async function callApi(action, params, btn, outId, dlId) {
     });
     const data = await res.json();
     out.innerText = data.output || data.error || "Done.";
-    if (dlId && data.downloads && data.downloads.length) {
-      const container = document.getElementById(dlId);
+    if (dlId && data.downloads) {
+      const box = document.getElementById(dlId);
       data.downloads.forEach(d => {
         const a = document.createElement('a');
-        a.href = d.url;
-        a.className = 'dl-link';
-        a.innerText = "⬇ Download " + d.label;
-        container.appendChild(a);
+        a.href = d.url; a.className = 'btn-secondary';
+        a.innerText = "⬇ " + d.label;
+        box.appendChild(a);
       });
     }
-  } catch (err) {
-    out.innerText = "Error: " + err;
   } finally {
-    btn.disabled = false;
-    btn.innerText = origText;
+    btn.disabled = false; btn.innerText = orig;
   }
-}
-
-function runVibeMidi(btn) {
-  callApi('vibe_midi', {
-    preset: selectedPreset,
-    bpm: document.getElementById('vibe-bpm').value,
-    bass: document.getElementById('vibe-bass').value,
-    groove: document.getElementById('vibe-groove').value
-  }, btn, 'out-vibe', 'dl-vibe');
 }
 
 function runAnalyze(mode, btn) {
-  if (!uploadedPaths['analyze-song']) return alert("Please upload an audio file first!");
-  callApi(mode === 'chords' ? 'analyze_audio' : 'stem_advisor', {
-    song: uploadedPaths['analyze-song']
-  }, btn, 'out-analyze', 'dl-analyze');
+  if (!state.uploaded['analyze-song']) return alert("Upload an audio file first.");
+  runTool(mode === 'chords' ? 'analyze_audio' : 'stem_advisor', { song: state.uploaded['analyze-song'] }, btn, 'out-analyze', 'dl-analyze');
 }
-
 function runMixCheck(btn) {
-  if (!uploadedPaths['mix-target']) return alert("Please upload your mix file first!");
-  callApi('mix_check', {
-    mix: uploadedPaths['mix-target'],
-    reference: uploadedPaths['mix-ref'] || null
-  }, btn, 'out-mix', null);
+  if (!state.uploaded['mix-target']) return alert("Upload a mix file first.");
+  runTool('mix_check', { mix: state.uploaded['mix-target'], reference: state.uploaded['mix-ref'] || null }, btn, 'out-mix', null);
 }
-
 function runMaster(btn) {
-  if (!uploadedPaths['master-target'] || !uploadedPaths['master-ref']) {
-    return alert("Please upload both your Mix and a Reference track!");
-  }
-  callApi('master_track', {
-    target: uploadedPaths['master-target'],
-    reference: uploadedPaths['master-ref']
-  }, btn, 'out-master', 'dl-master');
+  if (!state.uploaded['master-target'] || !state.uploaded['master-ref']) return alert("Upload both target mix and reference track.");
+  runTool('master_track', { target: state.uploaded['master-target'], reference: state.uploaded['master-ref'] }, btn, 'out-master', 'dl-master');
 }
-
 function runValidate(btn) {
-  if (!uploadedPaths['rn-audio'] && !uploadedPaths['rn-art']) {
-    return alert("Please upload an audio file and/or cover artwork!");
-  }
-  callApi('validate_release', {
-    audio: uploadedPaths['rn-audio'] || null,
-    artwork: uploadedPaths['rn-art'] || null,
-    fix: document.getElementById('rn-fix').checked
-  }, btn, 'out-rn', 'dl-rn');
+  if (!state.uploaded['rn-audio'] && !state.uploaded['rn-art']) return alert("Upload audio and/or cover artwork.");
+  runTool('validate_release', { audio: state.uploaded['rn-audio'] || null, artwork: state.uploaded['rn-art'] || null, fix: document.getElementById('rn-fix').checked }, btn, 'out-rn', 'dl-rn');
+}
+function runTimeline(btn) {
+  const title = document.getElementById('tl-title').value.trim() || "New Single";
+  const date = document.getElementById('tl-date').value;
+  runTool('release_timeline', { title, date }, btn, 'out-tl', 'dl-tl');
 }
 
-function runTimeline(btn) {
-  const title = document.getElementById('tl-title').value.trim() || "My New Single";
-  const date = document.getElementById('tl-date').value;
-  callApi('release_timeline', { title, date }, btn, 'out-tl', 'dl-tl');
-}
+// Init
+refreshPreview();
 </script>
 </body>
 </html>
@@ -545,7 +1408,7 @@ function runTimeline(btn) {
 
 class StudioHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
-        pass  # Keep terminal output clean
+        pass
 
     def _send_json(self, code: int, payload: dict):
         body = json.dumps(payload).encode("utf-8")
@@ -603,6 +1466,41 @@ class StudioHandler(BaseHTTPRequestHandler):
             self._send_json(200, {"path": str(dest), "name": fname})
             return
 
+        if parsed.path == "/api/preview_voicing":
+            raw = self.rfile.read(length).decode("utf-8")
+            req = json.loads(raw)
+            chords_str = (req.get("chords") or "").strip()
+            preset = req.get("preset", "heartbreak")
+            bpm = float(req.get("bpm", 130.0))
+            time_sig = req.get("time_signature", "4/4")
+            octave_offset = int(req.get("octave_offset", 0))
+            reroll = int(req.get("reroll", 0))
+            euc_raw = (req.get("euclidean") or "").strip()
+
+            try:
+                chord_list = _gp_mod.split_chord_tokens(chords_str) if chords_str else _gp_mod.PRESETS.get(preset, _gp_mod.PRESETS["heartbreak"])
+                _, meta = _gp_mod.build_midi_pattern(
+                    chord_symbols=chord_list,
+                    bpm=bpm,
+                    time_sig=time_sig,
+                    octave_offset=octave_offset,
+                    reroll_seed=reroll,
+                    include_bass=False,
+                    humanize_ms=0.0,
+                )
+                euc_pattern = None
+                if euc_raw and "," in euc_raw:
+                    k, n = [int(x.strip()) for x in euc_raw.split(",", 1)]
+                    if time_sig == "7/4" and n == 16:
+                        n = 14
+                    elif time_sig == "5/4" and n == 16:
+                        n = 10
+                    euc_pattern = _gp_mod.bjorklund(k, n)
+                self._send_json(200, {"ok": True, "bars": meta["bars"], "euclidean_pattern": euc_pattern})
+            except Exception as exc:
+                self._send_json(200, {"ok": False, "error": str(exc)})
+            return
+
         if parsed.path == "/api/run":
             raw = self.rfile.read(length).decode("utf-8")
             req = json.loads(raw)
@@ -612,17 +1510,40 @@ class StudioHandler(BaseHTTPRequestHandler):
 
             if action == "vibe_midi":
                 preset = params.get("preset", "heartbreak")
-                bpm = str(params.get("bpm", "125"))
+                chords = (params.get("chords") or "").strip()
+                bpm = str(params.get("bpm", "130"))
+                ts = params.get("time_signature", "4/4")
+                oct_off = str(params.get("octave_offset", "0"))
+                reroll = str(params.get("reroll", "0"))
+                swing = str(params.get("swing", "18"))
+                hum = str(params.get("humanize_ms", "10"))
                 bass = params.get("bass", "syncopated")
                 groove = params.get("groove", "")
-                out_file = WORKSPACE_ROOT / "output_midi" / f"{preset}_{bpm}bpm.mid"
-                args = [str(SCRIPTS["generate_pattern"]), "--preset", preset, "--bpm", bpm, "--output", str(out_file)]
+
+                tag = "custom" if chords else preset
+                ts_clean = ts.replace("/", "-")
+                out_file = WORKSPACE_ROOT / "output_midi" / f"{tag}_{bpm}bpm_{ts_clean}.mid"
+                args = [
+                    str(SCRIPTS["generate_pattern"]),
+                    "--bpm", bpm,
+                    "--time-signature", ts,
+                    "--octave-offset", oct_off,
+                    "--reroll", reroll,
+                    "--swing", swing,
+                    "--humanize-ms", hum,
+                    "--output", str(out_file),
+                ]
+                if chords:
+                    args.extend(["--chords", chords])
+                else:
+                    args.extend(["--preset", preset])
                 if bass == "none":
                     args.append("--no-bass")
                 else:
                     args.extend(["--bass-style", bass])
                 if groove:
                     args.extend(["--euclidean", groove])
+
                 ok, output = run_script(args)
                 if ok and out_file.exists():
                     url = to_rel_download(out_file)
@@ -706,7 +1627,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                 return
 
             if action == "release_timeline":
-                title = params.get("title", "My New Single")
+                title = params.get("title", "New Single")
                 date = params.get("date", "2026-12-31")
                 ics_path = WORKSPACE_ROOT / "release_timeline.ics"
                 ok, output = run_script([
@@ -745,9 +1666,9 @@ def main():
     port = find_free_port(args.port)
     url = f"http://127.0.0.1:{port}"
     server = ThreadingHTTPServer(("127.0.0.1", port), StudioHandler)
-    print(f"🎹 Producer Reborn Studio GUI running at: {url}")
-    print(f"   Python runtime: {PYTHON_BIN}")
-    print("   Press Ctrl+C to stop.")
+    print(f"Producer Reborn Studio GUI running at: {url}")
+    print(f"Python runtime: {PYTHON_BIN}")
+    print("Press Ctrl+C to stop.")
 
     if not args.no_browser:
         webbrowser.open(url)

@@ -56,8 +56,8 @@ pip install -r requirements.txt
 - **Windows:** Double-click `Start_Studio.bat`
 - **macOS / Linux:** Run `./Start_Studio.sh`
 
-Your browser opens a dark-mode studio dashboard with 5 drag-and-drop tabs:
-1. **Vibe-to-MIDI** (pick a mood + BPM slider $\rightarrow$ download `.mid`)
+Your browser opens a minimal, hardware-inspired studio dashboard with 5 drag-and-drop tabs:
+1. **Vibe-to-MIDI** (pick a mood OR write custom chords, choose `4/4` / `3/4` / `6/8` / `5/4` / `7/4`, audition live with the built-in browser Rhodes synth, & download `.mid`)
 2. **Song & Stem Doctor** (drop track $\rightarrow$ BPM, chords & vocal/bass pitch report)
 3. **Mix Doctor** (drop mix $\rightarrow$ headroom, stereo phase & bass mono check)
 4. **AI Mastering** (drop mix + reference $\rightarrow$ download 16-bit RouteNote FLAC)
