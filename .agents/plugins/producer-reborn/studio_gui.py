@@ -451,31 +451,74 @@ HTML_PAGE = r"""<!DOCTYPE html>
     .bar-chord { font-size: 15px; font-weight: 600; color: var(--stark); margin-bottom: 4px; }
     .bar-notes { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 
-    /* Harmonic Piano Roll Canvas */
+    /* Harmonic Piano Roll Canvas (True Pitch-Row Matrix) */
     .pianoroll-wrap {
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 4px;
-      padding: 10px;
+      padding: 8px;
       overflow-x: auto;
     }
     .pianoroll-grid {
       display: grid;
-      gap: 4px;
-      min-height: 156px;
+      gap: 0;
+      min-width: 520px;
+    }
+    .pr-header-cell {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      text-align: center;
+      background: var(--surface);
+    }
+    .pr-ruler-cell {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--muted);
+      padding: 0 6px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid #181c24;
+      background: #101319;
+    }
+    .pr-ruler-cell.black-key {
+      background: #0b0d12;
+      color: #5e667b;
+    }
+    .pr-slot {
+      height: 22px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid #181c24;
+      background: #101319;
+      padding: 2px 3px;
+      display: flex;
+      align-items: center;
+    }
+    .pr-slot.black-row {
+      background: #0b0d12;
     }
     .pr-note {
+      width: 100%;
+      height: 100%;
       background: #272d3d;
-      border: 1px solid #3c445c;
+      border: 1px solid #404a66;
       color: var(--text);
       font-family: var(--mono);
       font-size: 10px;
-      padding: 2px 6px;
+      padding: 0 6px;
       border-radius: 3px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      cursor: pointer;
     }
+    .pr-note:hover { border-color: var(--stark); }
     .pr-note.accent {
       background: var(--stark);
       color: var(--stark-fg);
@@ -499,7 +542,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
       font-family: var(--mono);
       font-size: 10px;
       color: var(--muted);
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 0.08s;
     }
+    .step-cell:hover { border-color: var(--border-hi); }
     .step-cell.hit {
       background: var(--surface-2);
       border-color: var(--border-hi);
@@ -510,6 +557,10 @@ HTML_PAGE = r"""<!DOCTYPE html>
       border-color: var(--stark);
       color: var(--stark-fg);
       font-weight: 700;
+    }
+    .step-cell.playing-step {
+      outline: 2px solid var(--mint);
+      outline-offset: -1px;
     }
 
     /* Mini Piano Keyboard */
@@ -715,13 +766,14 @@ HTML_PAGE = r"""<!DOCTYPE html>
           </div>
 
           <div class="ctrl-block">
-            <span class="ctrl-label">Preview Synth</span>
-            <div style="display:flex; gap:6px; align-items:center;">
+            <span class="ctrl-label">Preview Synth &amp; Transport</span>
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
               <select class="ctrl-select" id="synth-tone">
                 <option value="rhodes">Fender Rhodes Mk I</option>
                 <option value="pad">Warm Analog Pad</option>
                 <option value="pluck">Soft Keys Pluck</option>
               </select>
+              <button class="btn-secondary" id="metro-btn" onclick="toggleMetronome()" style="height:30px; padding:0 10px; border-color:var(--mint); color:var(--mint);" title="Toggle Beat Metronome">⏱ Metro: ON</button>
               <button class="btn-primary" id="play-btn" onclick="togglePlay()" style="height:30px; padding:0 12px;">▶ Play</button>
               <button class="btn-secondary" onclick="stopPlayback()" style="height:30px; padding:0 10px;">■</button>
             </div>
@@ -760,7 +812,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
               </div>
               <div class="ctrl-block">
                 <span class="ctrl-label">Percussion Groove</span>
-                <select class="ctrl-select" id="euclidean-groove" onchange="refreshPreview()">
+                <select class="ctrl-select" id="euclidean-groove" onchange="state.customStepsEdited=false; refreshPreview()">
                   <option value="">None (Keys + Bass only)</option>
                   <option value="5,16" selected>Afrobeat / Amapiano E(5,16)</option>
                   <option value="3,8">Reggaeton / Tresillo E(3,8)</option>
@@ -769,11 +821,11 @@ HTML_PAGE = r"""<!DOCTYPE html>
               </div>
               <div class="ctrl-block">
                 <span class="ctrl-label">Swing (<span id="swing-val">18</span>%)</span>
-                <input type="range" id="swing-slider" min="0" max="45" value="18" oninput="document.getElementById('swing-val').innerText=this.value; updateGrooveMeta()" />
+                <input type="range" id="swing-slider" min="0" max="45" value="18" oninput="document.getElementById('swing-val').innerText=this.value; updateGrooveMeta()" onchange="refreshPreview()" />
               </div>
               <div class="ctrl-block">
                 <span class="ctrl-label">Humanize (±<span id="hum-val">10</span>ms)</span>
-                <input type="range" id="hum-slider" min="0" max="25" value="10" oninput="document.getElementById('hum-val').innerText=this.value; updateGrooveMeta()" />
+                <input type="range" id="hum-slider" min="0" max="25" value="10" oninput="document.getElementById('hum-val').innerText=this.value; updateGrooveMeta()" onchange="refreshPreview()" />
               </div>
             </div>
             <div class="steps-grid" id="steps-grid"></div>
@@ -967,21 +1019,33 @@ const state = {
   customChords: "F#m9 - Dmaj7#11 - A/C# - Eadd9",
   octave: 0,
   timeSignature: "4/4",
+  beatsPerBar: 4,
   bpm: 130,
   reroll: 0,
+  metronome: true,
+  customStepsEdited: false,
+  stepVelocities: [],
   selectedBarIdx: 0,
   barsData: [],
   uploaded: {}
 };
 
-// Web Audio API Synth
+// Web Audio API Multi-Track Synth (Keys, Bass, Percussion, Metronome)
 let audioCtx = null;
+let noiseBuffer = null;
 let isPlaying = false;
 let playTimer = null;
+let uiTimers = [];
 
 function ensureAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (!noiseBuffer) {
+    const bufSize = audioCtx.sampleRate * 0.2;
+    noiseBuffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+    const out = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) out[i] = Math.random() * 2 - 1;
+  }
 }
 
 function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -1003,7 +1067,7 @@ function playTone(midiNote, startTime, duration) {
     filter.type = 'lowpass';
     filter.frequency.value = 1200;
     gain.gain.setValueAtTime(0.001, startTime);
-    gain.gain.linearRampToValueAtTime(0.06, startTime + 0.18);
+    gain.gain.linearRampToValueAtTime(0.055, startTime + 0.18);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
   } else if (mode === 'pluck') {
     osc1.type = 'triangle';
@@ -1012,10 +1076,9 @@ function playTone(midiNote, startTime, duration) {
     filter.frequency.setValueAtTime(3200, startTime);
     filter.frequency.exponentialRampToValueAtTime(500, startTime + 0.4);
     gain.gain.setValueAtTime(0.001, startTime);
-    gain.gain.linearRampToValueAtTime(0.11, startTime + 0.012);
+    gain.gain.linearRampToValueAtTime(0.10, startTime + 0.012);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + Math.min(duration, 0.9));
   } else {
-    // Fender Rhodes style bell + warm fundamental
     osc1.type = 'sine';
     osc2.type = 'triangle';
     osc2.detune.value = 3.5;
@@ -1023,7 +1086,7 @@ function playTone(midiNote, startTime, duration) {
     filter.frequency.setValueAtTime(2000, startTime);
     filter.frequency.exponentialRampToValueAtTime(700, startTime + 0.6);
     gain.gain.setValueAtTime(0.001, startTime);
-    gain.gain.linearRampToValueAtTime(0.09, startTime + 0.015);
+    gain.gain.linearRampToValueAtTime(0.085, startTime + 0.015);
     gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
   }
 
@@ -1040,10 +1103,104 @@ function playTone(midiNote, startTime, duration) {
   osc2.stop(startTime + duration + 0.05);
 }
 
+function playBassTone(midiNote, startTime, duration, velocity = 95) {
+  ensureAudioCtx();
+  const freq = midiToFreq(midiNote);
+  const oscSub = audioCtx.createOscillator();
+  const oscHarm = audioCtx.createOscillator();
+  const filter = audioCtx.createBiquadFilter();
+  const gain = audioCtx.createGain();
+
+  oscSub.type = 'sine';
+  oscHarm.type = 'triangle';
+  oscSub.frequency.setValueAtTime(freq, startTime);
+  oscHarm.frequency.setValueAtTime(freq * 2, startTime);
+
+  filter.type = 'lowpass';
+  filter.frequency.setValueAtTime(480, startTime);
+  filter.frequency.exponentialRampToValueAtTime(160, startTime + Math.min(duration, 0.45));
+
+  const amp = 0.22 * (velocity / 110);
+  gain.gain.setValueAtTime(0.001, startTime);
+  gain.gain.linearRampToValueAtTime(amp, startTime + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + Math.max(0.12, duration));
+
+  oscSub.connect(filter);
+  oscHarm.connect(filter);
+  filter.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  oscSub.start(startTime);
+  oscHarm.start(startTime);
+  oscSub.stop(startTime + duration + 0.05);
+  oscHarm.stop(startTime + duration + 0.05);
+}
+
+function playPercHit(startTime, velocity = 90) {
+  ensureAudioCtx();
+  const src = audioCtx.createBufferSource();
+  src.buffer = noiseBuffer;
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.setValueAtTime(6200, startTime);
+
+  const gain = audioCtx.createGain();
+  const amp = 0.14 * (velocity / 115);
+  gain.gain.setValueAtTime(0.001, startTime);
+  gain.gain.linearRampToValueAtTime(amp, startTime + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.055);
+
+  src.connect(hp);
+  hp.connect(gain);
+  gain.connect(audioCtx.destination);
+
+  src.start(startTime);
+  src.stop(startTime + 0.07);
+}
+
+function playMetroClick(startTime, accentType = 'normal') {
+  ensureAudioCtx();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  const freq = accentType === 'downbeat' ? 1320 : accentType === 'secondary' ? 990 : 780;
+  const amp = accentType === 'downbeat' ? 0.16 : 0.09;
+
+  osc.frequency.setValueAtTime(freq, startTime);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.72, startTime + 0.025);
+
+  gain.gain.setValueAtTime(0.001, startTime);
+  gain.gain.linearRampToValueAtTime(amp, startTime + 0.002);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.032);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + 0.04);
+}
+
+function toggleMetronome() {
+  state.metronome = !state.metronome;
+  const btn = document.getElementById('metro-btn');
+  btn.innerText = state.metronome ? "⏱ Metro: ON" : "⏱ Metro: OFF";
+  btn.style.borderColor = state.metronome ? "var(--mint)" : "var(--border)";
+  btn.style.color = state.metronome ? "var(--mint)" : "var(--muted)";
+}
+
 function playChord(pitches, duration = 1.2) {
   ensureAudioCtx();
   const now = audioCtx.currentTime;
-  pitches.forEach((p, idx) => playTone(p, now + idx * 0.012, duration));
+  const humSec = parseFloat(document.getElementById('hum-slider').value) / 1000.0;
+  pitches.forEach((p, idx) => {
+    const jitter = (Math.random() * 2 - 1) * humSec;
+    playTone(p, Math.max(now, now + idx * 0.012 + jitter), duration);
+  });
+}
+
+function clearUiTimers() {
+  uiTimers.forEach(t => clearTimeout(t));
+  uiTimers = [];
+  document.querySelectorAll('.step-cell.playing-step').forEach(el => el.classList.remove('playing-step'));
 }
 
 function togglePlay() {
@@ -1052,25 +1209,89 @@ function togglePlay() {
   ensureAudioCtx();
   isPlaying = true;
   document.getElementById('play-btn').innerText = "⏸ Playing";
-  let stepIdx = 0;
+  let barCounter = 0;
 
-  function scheduleNext() {
+  function scheduleNextBar() {
     if (!isPlaying) return;
-    const bar = state.barsData[stepIdx % state.barsData.length];
-    state.selectedBarIdx = stepIdx % state.barsData.length;
+    clearUiTimers();
+    const barIdx = barCounter % state.barsData.length;
+    const bar = state.barsData[barIdx];
+    state.selectedBarIdx = barIdx;
     renderBarsAndKeyboard(true);
-    const barSec = bar.duration_sec || 1.8;
-    playChord(bar.pitches, Math.max(0.5, barSec * 0.92));
-    stepIdx++;
-    playTimer = setTimeout(scheduleNext, barSec * 1000);
+
+    const secPerBeat = 60.0 / state.bpm;
+    const beatsPerBar = state.beatsPerBar || 4.0;
+    const barSec = secPerBeat * beatsPerBar;
+    const humSec = parseFloat(document.getElementById('hum-slider').value) / 1000.0;
+    const swingPct = parseFloat(document.getElementById('swing-slider').value);
+    const barStart = audioCtx.currentTime + 0.03;
+
+    // 1. Schedule Keys (Chord)
+    bar.pitches.forEach((p, idx) => {
+      const jitter = (Math.random() * 2 - 1) * humSec;
+      playTone(p, Math.max(audioCtx.currentTime, barStart + idx * 0.01 + jitter), Math.max(0.4, barSec * 0.92));
+    });
+
+    // 2. Schedule Bassline Events
+    if (bar.bass_events && bar.bass_events.length) {
+      bar.bass_events.forEach(ev => {
+        const bStart = barStart + (ev.beat * secPerBeat);
+        const bDur = Math.max(0.12, ev.dur_beats * secPerBeat);
+        playBassTone(ev.pitch, bStart, bDur, ev.vel || 95);
+      });
+    }
+
+    // 3. Schedule Percussion Steps with Swing & Humanize
+    const steps = state.stepVelocities;
+    if (steps && steps.length) {
+      const stepDur = barSec / steps.length;
+      steps.forEach((vel, sIdx) => {
+        const swingShift = (sIdx % 2 === 1 && swingPct > 0) ? (swingPct / 100.0) * (stepDur * 0.35) : 0;
+        const humShift = (Math.random() * 2 - 1) * (humSec * 0.5);
+        const hitTime = Math.max(barStart, barStart + sIdx * stepDur + swingShift + humShift);
+        if (vel > 0) playPercHit(hitTime, vel);
+
+        const delayMs = Math.max(0, (hitTime - audioCtx.currentTime) * 1000);
+        uiTimers.push(setTimeout(() => {
+          if (!isPlaying) return;
+          document.querySelectorAll('.step-cell').forEach((el, i) => {
+            el.classList.toggle('playing-step', i === sIdx);
+          });
+        }, delayMs));
+      });
+    }
+
+    // 4. Schedule Metronome Clicks & Beat Readout
+    const numClicks = state.timeSignature === '6/8' ? 6 : Math.round(beatsPerBar);
+    const clickSpacing = state.timeSignature === '6/8' ? secPerBeat * 0.5 : secPerBeat;
+    for (let c = 0; c < numClicks; c++) {
+      const cTime = barStart + (c * clickSpacing);
+      let accent = 'normal';
+      if (c === 0) accent = 'downbeat';
+      else if ((state.timeSignature === '6/8' && c === 3) || (state.timeSignature === '7/4' && c === 4) || (state.timeSignature === '5/4' && c === 3)) {
+        accent = 'secondary';
+      }
+      if (state.metronome) playMetroClick(cTime, accent);
+
+      const cDelayMs = Math.max(0, (cTime - audioCtx.currentTime) * 1000);
+      uiTimers.push(setTimeout(() => {
+        if (!isPlaying) return;
+        document.getElementById('hdr-telemetry').innerText = `${state.bpm.toFixed(1)} BPM • ${state.timeSignature} • Beat ${c + 1}/${numClicks}`;
+      }, cDelayMs));
+    }
+
+    barCounter++;
+    playTimer = setTimeout(scheduleNextBar, barSec * 1000);
   }
-  scheduleNext();
+  scheduleNextBar();
 }
 
 function stopPlayback() {
   isPlaying = false;
   if (playTimer) clearTimeout(playTimer);
+  clearUiTimers();
   document.getElementById('play-btn').innerText = "▶ Play";
+  updateTelemetry();
   renderBarsAndKeyboard(false);
 }
 
@@ -1137,6 +1358,7 @@ function pickTimeSig(el) {
   document.querySelectorAll('#timesig-group .seg-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   state.timeSignature = el.dataset.ts;
+  state.customStepsEdited = false;
   updateTelemetry();
   refreshPreview();
 }
@@ -1156,7 +1378,6 @@ function updateGrooveMeta() {
   const sw = document.getElementById('swing-slider').value;
   const hm = document.getElementById('hum-slider').value;
   document.getElementById('groove-meta').innerText = `Swing: ${sw}% • Humanize: ±${hm}ms`;
-  renderStepsStrip();
 }
 
 function rerollInversion() {
@@ -1178,17 +1399,27 @@ async function refreshPreview() {
       time_signature: state.timeSignature,
       octave_offset: state.octave,
       reroll: state.reroll,
-      euclidean: document.getElementById('euclidean-groove').value
+      bass: document.getElementById('bass-style').value,
+      euclidean: document.getElementById('euclidean-groove').value,
+      custom_steps: state.customStepsEdited ? state.stepVelocities : null,
+      swing: document.getElementById('swing-slider').value,
+      humanize_ms: document.getElementById('hum-slider').value
     })
   });
   const data = await res.json();
   if (data.ok) {
     state.barsData = data.bars;
+    state.beatsPerBar = data.beats_per_bar || 4.0;
+    if (!state.customStepsEdited) {
+      state.stepVelocities = data.step_velocities && data.step_velocities.length
+        ? data.step_velocities
+        : Array(state.timeSignature === '7/4' ? 14 : 16).fill(0);
+    }
     if (state.selectedBarIdx >= state.barsData.length) state.selectedBarIdx = 0;
     document.getElementById('pr-meta').innerText = `${state.barsData.length} Bars • ${state.timeSignature} • Voice-Led`;
     renderBarsAndKeyboard(false);
     renderPianoRoll();
-    renderStepsStrip(data.euclidean_pattern);
+    renderStepsStrip();
   }
 }
 
@@ -1245,38 +1476,85 @@ function renderBarsAndKeyboard(isLoopPlaying) {
 
 function ensureTime() { ensureAudioCtx(); return audioCtx.currentTime; }
 
-function renderPianoRoll() {
-  const pr = document.getElementById('pianoroll-grid');
-  pr.style.gridTemplateColumns = `repeat(${Math.max(1, state.barsData.length)}, 1fr)`;
-  pr.innerHTML = '';
-  state.barsData.forEach(b => {
-    const col = document.createElement('div');
-    col.style.display = 'flex';
-    col.style.flexDirection = 'column-reverse';
-    col.style.gap = '4px';
-    col.style.borderRight = '1px solid var(--border)';
-    col.style.paddingRight = '4px';
-    b.pitches.forEach((p, idx) => {
-      const n = document.createElement('div');
-      const isTop = idx === b.pitches.length - 1;
-      n.className = 'pr-note' + (isTop ? ' accent' : '');
-      n.innerHTML = `<span>${b.notes[idx]}</span><span>${idx === 0 ? 'Bass' : isTop ? 'Top' : 'Voice'}</span>`;
-      col.appendChild(n);
-    });
-    pr.appendChild(col);
-  });
+function midiToName(midi) {
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  return names[midi % 12] + (Math.floor(midi / 12) - 1);
 }
 
-function renderStepsStrip(pattern) {
+function isBlackKey(midi) {
+  return [1, 3, 6, 8, 10].includes(midi % 12);
+}
+
+function renderPianoRoll() {
+  const pr = document.getElementById('pianoroll-grid');
+  pr.innerHTML = '';
+  if (!state.barsData.length) return;
+
+  const allPitches = state.barsData.flatMap(b => b.pitches);
+  const minPitch = Math.min(...allPitches) - 1;
+  const maxPitch = Math.max(...allPitches) + 1;
+  const numBars = state.barsData.length;
+
+  pr.style.gridTemplateColumns = `48px repeat(${numBars}, minmax(100px, 1fr))`;
+
+  // Header row
+  const corner = document.createElement('div');
+  corner.className = 'pr-header-cell';
+  corner.innerText = 'PITCH';
+  pr.appendChild(corner);
+  state.barsData.forEach(b => {
+    const h = document.createElement('div');
+    h.className = 'pr-header-cell';
+    h.innerText = `BAR ${b.bar} (${b.symbol})`;
+    pr.appendChild(h);
+  });
+
+  // Pitch rows from top (maxPitch) to bottom (minPitch)
+  for (let pitch = maxPitch; pitch >= minPitch; pitch--) {
+    const black = isBlackKey(pitch);
+    const ruler = document.createElement('div');
+    ruler.className = 'pr-ruler-cell' + (black ? ' black-key' : '');
+    ruler.innerText = midiToName(pitch);
+    pr.appendChild(ruler);
+
+    state.barsData.forEach(b => {
+      const slot = document.createElement('div');
+      slot.className = 'pr-slot' + (black ? ' black-row' : '');
+      const idx = b.pitches.indexOf(pitch);
+      if (idx !== -1) {
+        const isTop = idx === b.pitches.length - 1;
+        const isLowest = idx === 0;
+        const noteEl = document.createElement('div');
+        noteEl.className = 'pr-note' + (isTop ? ' accent' : '');
+        noteEl.innerHTML = `<span>${b.notes[idx]}</span><span>${isLowest ? 'Root/Bass' : isTop ? 'Top' : ''}</span>`;
+        noteEl.onclick = () => playTone(pitch, ensureTime(), 0.7);
+        slot.appendChild(noteEl);
+      }
+      pr.appendChild(slot);
+    });
+  }
+}
+
+function renderStepsStrip() {
   const strip = document.getElementById('steps-grid');
-  const stepArr = pattern || [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0];
+  const stepArr = state.stepVelocities && state.stepVelocities.length
+    ? state.stepVelocities
+    : Array(16).fill(0);
   strip.style.gridTemplateColumns = `repeat(${Math.min(16, stepArr.length)}, 1fr)`;
   strip.innerHTML = '';
-  stepArr.forEach((val, idx) => {
+  stepArr.forEach((vel, idx) => {
     const cell = document.createElement('div');
-    const isDownbeat = idx === 0 || idx === Math.floor(stepArr.length / 2);
-    cell.className = 'step-cell' + (val ? (isDownbeat ? ' accent' : ' hit') : '');
-    cell.innerHTML = `<div>${String(idx + 1).padStart(2, '0')}</div><div>${val ? (isDownbeat ? '115' : '82') : '-'}</div>`;
+    cell.className = 'step-cell' + (vel >= 105 ? ' accent' : vel > 0 ? ' hit' : '');
+    cell.title = 'Click to toggle step: Off -> Hit (82) -> Accent (115)';
+    cell.onclick = () => {
+      state.customStepsEdited = true;
+      const cur = state.stepVelocities[idx] || 0;
+      const next = cur === 0 ? 82 : cur < 105 ? 115 : 0;
+      state.stepVelocities[idx] = next;
+      renderStepsStrip();
+      if (next > 0) playPercHit(ensureTime(), next);
+    };
+    cell.innerHTML = `<div>${String(idx + 1).padStart(2, '0')}</div><div>${vel > 0 ? vel : '-'}</div>`;
     strip.appendChild(cell);
   });
 }
@@ -1300,7 +1578,8 @@ async function exportMidi(btn) {
         swing: document.getElementById('swing-slider').value,
         humanize_ms: document.getElementById('hum-slider').value,
         bass: document.getElementById('bass-style').value,
-        groove: document.getElementById('euclidean-groove').value
+        groove: document.getElementById('euclidean-groove').value,
+        custom_steps: state.customStepsEdited ? state.stepVelocities : null
       }
     })
   });
@@ -1475,28 +1754,37 @@ class StudioHandler(BaseHTTPRequestHandler):
             time_sig = req.get("time_signature", "4/4")
             octave_offset = int(req.get("octave_offset", 0))
             reroll = int(req.get("reroll", 0))
+            bass_style = req.get("bass", "syncopated")
             euc_raw = (req.get("euclidean") or "").strip()
+            custom_steps = req.get("custom_steps")
+            swing = float(req.get("swing", 18.0))
+            humanize_ms = float(req.get("humanize_ms", 10.0))
 
             try:
                 chord_list = _gp_mod.split_chord_tokens(chords_str) if chords_str else _gp_mod.PRESETS.get(preset, _gp_mod.PRESETS["heartbreak"])
+                euc_tuple = None
+                if euc_raw and "," in euc_raw:
+                    k, n = [int(x.strip()) for x in euc_raw.split(",", 1)]
+                    euc_tuple = (k, n)
                 _, meta = _gp_mod.build_midi_pattern(
                     chord_symbols=chord_list,
                     bpm=bpm,
                     time_sig=time_sig,
                     octave_offset=octave_offset,
                     reroll_seed=reroll,
-                    include_bass=False,
-                    humanize_ms=0.0,
+                    include_bass=(bass_style != "none"),
+                    bass_style="syncopated" if bass_style == "none" else bass_style,
+                    euclidean_spec=euc_tuple,
+                    custom_steps=custom_steps,
+                    swing_pct=swing,
+                    humanize_ms=humanize_ms,
                 )
-                euc_pattern = None
-                if euc_raw and "," in euc_raw:
-                    k, n = [int(x.strip()) for x in euc_raw.split(",", 1)]
-                    if time_sig == "7/4" and n == 16:
-                        n = 14
-                    elif time_sig == "5/4" and n == 16:
-                        n = 10
-                    euc_pattern = _gp_mod.bjorklund(k, n)
-                self._send_json(200, {"ok": True, "bars": meta["bars"], "euclidean_pattern": euc_pattern})
+                self._send_json(200, {
+                    "ok": True,
+                    "bars": meta["bars"],
+                    "beats_per_bar": meta["beats_per_bar"],
+                    "step_velocities": meta["step_velocities"],
+                })
             except Exception as exc:
                 self._send_json(200, {"ok": False, "error": str(exc)})
             return
@@ -1519,6 +1807,7 @@ class StudioHandler(BaseHTTPRequestHandler):
                 hum = str(params.get("humanize_ms", "10"))
                 bass = params.get("bass", "syncopated")
                 groove = params.get("groove", "")
+                custom_steps = params.get("custom_steps")
 
                 tag = "custom" if chords else preset
                 ts_clean = ts.replace("/", "-")
@@ -1541,7 +1830,9 @@ class StudioHandler(BaseHTTPRequestHandler):
                     args.append("--no-bass")
                 else:
                     args.extend(["--bass-style", bass])
-                if groove:
+                if custom_steps:
+                    args.extend(["--custom-steps", ",".join(str(int(v)) for v in custom_steps)])
+                elif groove:
                     args.extend(["--euclidean", groove])
 
                 ok, output = run_script(args)

@@ -341,6 +341,7 @@ def build_midi_pattern(
     include_bass: bool = True,
     bass_style: str = "syncopated",
     euclidean_spec: tuple[int, int] | None = None,
+    custom_steps: list[int] | None = None,
     swing_pct: float = 0.0,
     humanize_ms: float = 10.0,
 ):
@@ -370,15 +371,7 @@ def build_midi_pattern(
             voicing = chord_voicings[idx]
             end_time = current_time + chord_duration
 
-            if rep == 0:
-                bar_metadata.append({
-                    "bar": idx + 1,
-                    "symbol": clean_sym,
-                    "pitches": voicing,
-                    "notes": [midi_to_note_name(p) for p in voicing],
-                    "start_sec": round(current_time, 3),
-                    "duration_sec": round(chord_duration, 3),
-                })
+            bar_bass_events = []
 
             for pitch in voicing:
                 offset = rng.uniform(-hum_sec, hum_sec) if hum_sec > 0 else 0.0
@@ -396,48 +389,77 @@ def build_midi_pattern(
 
                 hits = get_bass_hits(bass_style, beats_per_bar, sec_per_beat)
                 for beat_pos, dur_beats, iv in hits:
-                    # Apply swing to off-beat eighth positions (e.g. X.5 beats)
-                    swing_shift = 0.0
+                    swing_shift_beats = 0.0
                     if swing_pct > 0 and abs((beat_pos * 2) % 2 - 1.0) < 0.05:
-                        swing_shift = (swing_pct / 100.0) * (sec_per_beat * 0.25)
+                        swing_shift_beats = (swing_pct / 100.0) * 0.25
 
-                    b_start = max(0.0, current_time + (beat_pos * sec_per_beat) + swing_shift)
+                    b_start = max(0.0, current_time + ((beat_pos + swing_shift_beats) * sec_per_beat))
                     b_end = min(end_time - 0.02, b_start + (dur_beats * sec_per_beat))
                     if b_end <= b_start:
                         continue
                     b_vel = rng.randint(84, 102) if hum_sec > 0 else 92
+                    b_pitch = bass_root_pitch + iv
                     bass_inst.notes.append(pretty_midi.Note(
                         velocity=b_vel,
-                        pitch=bass_root_pitch + iv,
+                        pitch=b_pitch,
                         start=b_start,
                         end=b_end
                     ))
+                    if rep == 0:
+                        bar_bass_events.append({
+                            "beat": round(beat_pos + swing_shift_beats, 3),
+                            "dur_beats": dur_beats,
+                            "pitch": b_pitch,
+                            "note": midi_to_note_name(b_pitch),
+                            "vel": b_vel,
+                        })
+
+            if rep == 0:
+                bar_metadata.append({
+                    "bar": idx + 1,
+                    "symbol": clean_sym,
+                    "pitches": voicing,
+                    "notes": [midi_to_note_name(p) for p in voicing],
+                    "bass_events": bar_bass_events,
+                    "start_sec": round(current_time, 3),
+                    "duration_sec": round(chord_duration, 3),
+                })
 
             current_time = end_time
 
-    if euclidean_spec:
+    step_velocities = []
+    has_perc = bool(custom_steps) or bool(euclidean_spec)
+    if custom_steps:
+        step_velocities = [max(0, min(127, int(v))) for v in custom_steps]
+    elif euclidean_spec:
         k, n = euclidean_spec
-        # Scale steps if meter is 7/4 or 5/4 with default 16-step setting
         steps_per_bar = n
         if abs(beats_per_bar - 7.0) < 0.01 and n == 16:
             steps_per_bar = 14
         elif abs(beats_per_bar - 5.0) < 0.01 and n == 16:
             steps_per_bar = 10
+        raw_pat = bjorklund(k, steps_per_bar)
+        for s_idx, hit in enumerate(raw_pat):
+            if hit:
+                is_accent = (s_idx == 0) or (s_idx == steps_per_bar // 2)
+                step_velocities.append(115 if is_accent else 82)
+            else:
+                step_velocities.append(0)
 
-        pattern = bjorklund(k, steps_per_bar)
+    if step_velocities and any(v > 0 for v in step_velocities):
+        steps_per_bar = len(step_velocities)
         step_duration = sec_per_bar / float(steps_per_bar)
         total_bars = bars_per_chord * len(parsed_chords) * repeats
         total_steps = int(round(total_bars * steps_per_bar))
         drum_pitch = 42  # Closed Hi-Hat
 
         for s in range(total_steps):
-            if pattern[s % steps_per_bar] == 1:
+            base_vel = step_velocities[s % steps_per_bar]
+            if base_vel > 0:
                 swing_shift = (swing_pct / 100.0) * (step_duration * 0.35) if (s % 2 == 1 and swing_pct > 0) else 0.0
                 t_offset = rng.uniform(-hum_sec * 0.5, hum_sec * 0.5) if hum_sec > 0 else 0.0
                 t_start = max(0.0, s * step_duration + swing_shift + t_offset)
-                vel = rng.randint(76, 102) if hum_sec > 0 else 90
-                if (s % steps_per_bar) == 0:
-                    vel = min(122, vel + 15)
+                vel = max(1, min(127, base_vel + (rng.randint(-5, 5) if hum_sec > 0 else 0)))
                 drum_inst.notes.append(pretty_midi.Note(
                     velocity=vel,
                     pitch=drum_pitch,
@@ -448,7 +470,7 @@ def build_midi_pattern(
     midi.instruments.append(chords_inst)
     if include_bass:
         midi.instruments.append(bass_inst)
-    if euclidean_spec:
+    if step_velocities and any(v > 0 for v in step_velocities):
         midi.instruments.append(drum_inst)
 
     meta = {
@@ -457,6 +479,7 @@ def build_midi_pattern(
         "beats_per_bar": beats_per_bar,
         "octave_offset": octave_offset,
         "bars": bar_metadata,
+        "step_velocities": step_velocities,
         "tracks": [i.name for i in midi.instruments],
     }
     return midi, meta
@@ -477,6 +500,7 @@ def main():
     parser.add_argument("--no-bass", action="store_true", help="Do not generate accompanying bassline")
     parser.add_argument("--bass-style", choices=["syncopated", "eighth", "walking"], default="syncopated", help="Bass groove style")
     parser.add_argument("--euclidean", help="Generate Euclidean rhythm track as K,N (e.g. '5,16' or '3,8')")
+    parser.add_argument("--custom-steps", help="Comma-separated custom step velocities (e.g. '115,0,0,82,...')")
     parser.add_argument("--output", default="output_midi/procedural_pattern.mid", help="Output MIDI file path")
     parser.add_argument("--json-meta", help="Optional path to write structured bar/voicing JSON metadata")
     args = parser.parse_args()
@@ -495,6 +519,14 @@ def main():
             euclidean_tuple = (parts[0], parts[1])
         except Exception:
             print("[!] Invalid format for --euclidean. Use 'K,N' (e.g. '5,16').")
+            sys.exit(1)
+
+    custom_steps_list = None
+    if args.custom_steps and args.custom_steps.strip():
+        try:
+            custom_steps_list = [int(x.strip()) for x in args.custom_steps.split(",") if x.strip() != ""]
+        except Exception:
+            print("[!] Invalid format for --custom-steps. Use comma-separated integers.")
             sys.exit(1)
 
     out_path = Path(args.output).resolve()
@@ -522,6 +554,7 @@ def main():
         include_bass=not args.no_bass,
         bass_style=args.bass_style,
         euclidean_spec=euclidean_tuple,
+        custom_steps=custom_steps_list,
         swing_pct=args.swing,
         humanize_ms=args.humanize_ms,
     )
