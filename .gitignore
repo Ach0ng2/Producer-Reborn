@@ -1,0 +1,30 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Personal memory & local workspace state
+MEMORY.md
+releases/*
+!releases/TEMPLATE.md
+
+# Generated audio, stems, MIDI, uploads & calendars
+uploads/
+output_midi/
+output_stems/
+output_master/
+*.ics
+*.wav
+*.mp3
+*.flac
+*.mid
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+scratch_mc/

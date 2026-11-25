@@ -1,0 +1,13 @@
+{
+  "name": "producer-reborn",
+  "displayName": "Producer Reborn Studio",
+  "version": "1.2.0",
+  "description": "End-to-end $0 independent music production pipeline with a Zero-CMD Web Studio GUI: Vibe-First MIDI generation, songwriting, BPM-synced transcription, pitch review, mix doctor, Matchering AI mastering, and RouteNote release compliance.",
+  "logo": "assets/logo.png",
+  "suggestedPrompts": [
+    "Open the Producer Reborn Studio Web GUI",
+    "Generate a heartbreak or late-night chord progression in MIDI",
+    "Analyze BPM, chords, vocals, and bassline from my audio track",
+    "Run Mix Doctor and Matchering AI mastering against a reference track"
+  ]
+}
