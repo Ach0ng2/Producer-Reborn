@@ -82,16 +82,8 @@ If your track uses non-exclusive loops (Looperman, Splice, etc.), you **can** di
 
 ## 🙏 Credits & Open-Source Acknowledgments
 
-Producer Reborn Studio is built on top of incredible open-source projects, DSP engines, and community AI skills:
+Producer Reborn Studio is built on top of incredible open-source audio, DSP, and music processing engines:
 
-### AI Skills & Design Foundations
-- **[NuNaught/suno-songwriting-skill](https://github.com/NuNaught/suno-songwriting-skill)** — Songwriting craft heuristics, song anatomy, and genre-fusion frameworks.
-- **[SJY051/music-composition](https://github.com/SJY051/music-composition)** — Modular music theory, voice leading, reharmonization, and 24+ genre reference guides.
-- **[Applied Music Theory Guide (`2094-music-theory`)](https://www.thepromptindex.com/skill/2094-music-theory)** — Practical descriptive harmony, voice-leading principles, and modal interchange concepts.
-- **[Generative Music Composer](https://mcpmarket.com/tools/skills/generative-music-composer)** (*organvm-iv-taxis*) — Algorithmic composition inspiration for Euclidean rhythms and procedural MIDI patterns.
-- **[miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop)** — Anti-Slop UI/UX principles used to shape the minimal, tactile Web Studio GUI.
-
-### Audio, DSP & Music Processing Engines
 - **[Spotify Basic Pitch](https://github.com/spotify/basic-pitch)** — Lightweight polyphonic audio-to-MIDI neural transcription (ONNX).
 - **[Matchering](https://github.com/sergree/matchering)** (*sergree*) — Open-source automated reference-based audio mastering.
 - **[Demucs](https://github.com/facebookresearch/demucs)** (*Meta Research / `demucs-onnx`*) — Deep learning audio source separation into stems.

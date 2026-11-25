@@ -53,9 +53,4 @@ releases/<project-slug>/
 
 ## Open-Source Credits & Acknowledgments
 
-- **[NuNaught/suno-songwriting-skill](https://github.com/NuNaught/suno-songwriting-skill)** — Songwriting craft & arrangement heuristics.
-- **[SJY051/music-composition](https://github.com/SJY051/music-composition)** — Modular composition theory, harmony, & genre references.
-- **[The Prompt Index (`2094-music-theory`)](https://www.thepromptindex.com/skill/2094-music-theory)** — Descriptive applied music theory & modal interchange.
-- **[Generative Music Composer](https://mcpmarket.com/tools/skills/generative-music-composer)** — Algorithmic composition & Euclidean rhythm inspiration.
-- **[miqdadbadjuber/anti-slop](https://github.com/miqdadbadjuber/anti-slop)** — Anti-Slop minimal UI design guidelines.
 - **[Spotify Basic Pitch](https://github.com/spotify/basic-pitch)**, **[Matchering](https://github.com/sergree/matchering)**, **[Demucs](https://github.com/facebookresearch/demucs)**, **[librosa](https://github.com/librosa/librosa)**, **[pretty-midi](https://github.com/craffel/pretty-midi)**, and **[FFmpeg](https://ffmpeg.org/)**.
