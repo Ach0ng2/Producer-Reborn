@@ -68,16 +68,19 @@ Choruses can be more general than verses — the chorus is the universal stateme
 
 But even chorus lyrics benefit from imagery. "Bohemian Rhapsody"'s "Mama, just killed a man" is visceral; "Bohemian Rhapsody"'s lyrics generally are filled with strange specifics that make it unforgettable.
 
-### Sensory detail
+### Sensory detail (The Seven Senses / Object Writing)
 
-Lyrics work when they evoke senses:
+Following Pat Pattison's *Object Writing* framework, lyrics become emotionally sticky when they layer **all seven senses**:
 
-- Sight: colors, light, motion, place
-- Sound: voice, weather, environment
-- Touch: skin, fabric, temperature
-- Smell, taste: less common but powerful when used
+- **Sight:** colors, light, posture, facial expression
+- **Hearing:** background songs, weather, room noise, vocal tone
+- **Smell:** rain, perfume, smoke, asphalt
+- **Taste:** drinks, bitterness, salt
+- **Touch:** skin, fabric, temperature, weight
+- **Organic:** internal body sensations (heart pounding, stomach dropping, breath catching)
+- **Kinesthetic:** physical movement & space (pacing, shaking, two-stepping, leaning)
 
-A song with no sensory imagery is purely conceptual; the listener doesn't "see" anything.
+A song with no sensory imagery is purely conceptual; the listener doesn't "live" inside the scene. Layering movement (kinesthetic) or visceral sensation (organic) with visual detail anchors memorable choruses.
 
 ## Rhyme
 

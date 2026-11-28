@@ -8,7 +8,7 @@ An open-source, zero-budget ($0) AI-assisted independent music production and di
 
 ```text
 1. Songwriting & Composition    (skills: songwriting, music-composition)
-   - Lyrical craft, ABABCB anatomy, hooks, applied voice leading, modal interchange, & 24+ genre frameworks.
+   - Seven-Senses Object Writing (10-minute sensory drill), ABABCB anatomy, hooks, applied voice leading, modal interchange, & 24+ genre frameworks.
 2. Procedural & Synced MIDI     (skills: music-composition -> generate_pattern.py, audio-analysis -> analyze_audio.py)
    - Procedural voice-led chord progressions, generative basslines, Euclidean rhythms, & audio-to-MIDI transcription.
 3. Stem & Intonation Review     (skill: audio-analysis -> stem_advisor.py)

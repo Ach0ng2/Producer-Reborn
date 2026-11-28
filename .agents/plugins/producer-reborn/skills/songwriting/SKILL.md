@@ -90,9 +90,18 @@ A great song is a journey, not a flat highway.
 
 ## 4. Writing Lyrics That Breathe
 
-### Show, Don't Tell:
+### Show, Don't Tell (Seven-Senses Object Writing):
 * *Flat (Tell):* "I miss you so much and I feel really sad alone."
 * *Vivid (Show):* "Your jacket's still hanging behind the door, two cold mugs sitting by the sink."
+* **Pat Pattison's 7-Senses Method (10-Minute Object Writing):** Before writing rhymes, pick **one specific concrete moment** (not a vague theme like "a breakup") and brainstorm raw details for 10 minutes across all 7 senses:
+  1. **Sight** (what you see)
+  2. **Hearing** (ambient sound, music, voice)
+  3. **Smell** (scent, air, weather)
+  4. **Taste** (lingering flavor, drinks)
+  5. **Touch** (physical contact, texture, temperature)
+  6. **Organic** (internal body reactions: heart racing, stomach dropping, breath catching)
+  7. **Kinesthetic** (bodily motion: pacing, shaking, dancing, leaning)
+* **Build the Chorus:** Circle the **2–3 hardest-hitting details** (e.g., stacking *Kinesthetic movement* + *Sight* + *Taste*) and anchor your Chorus around them. Let the remaining senses paint the Verses.
 * *Exception:* A blunt, unfiltered statement can carry raw emotional power if placed at the emotional climax.
 
 ### The Hook:
@@ -135,6 +144,7 @@ Designed for producers who start from beats or loops:
 ## 7. Additional Reference Modules
 
 Explore these focused reference guides:
-* 📖 [Lyric Craft & Length Heuristics](references/lyric-craft-heuristics.md) — Song length vs. line counts (30s to 4+ mins), hook formulas, and 6-point lyric revision checklist.
+* 🎯 [Seven-Senses "Object Writing" Guide](references/seven-senses-object-writing.md) — Pat Pattison's 10-minute sensory exercise (Sight, Hearing, Smell, Taste, Touch, Organic, Kinesthetic) for building vivid Choruses.
+* 📖 [Lyric Craft & Length Heuristics](references/lyric-craft-heuristics.md) — Song length vs. line counts (30s to 4+ mins), hook formulas, and 7-point lyric revision checklist.
 * 🎛️ [Instrument Roles & Arrangement Vocabulary](references/instrument-roles.md) — 8 arrangement roles (Pulse carrier, Groove anchor, Harmonic bed, etc.), groove feels (*straight, swung, laid-back, half-time*), and density shaping.
 * 🎨 [Genre Fusion & Production Aesthetics](references/genre-fusion-guide.md) — The 1 Anchor + 1-2 Modifiers formula, era references (70s/80s/90s/modern), and 5 dimensions of sonic texture.

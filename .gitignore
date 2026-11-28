@@ -8,11 +8,12 @@ MEMORY.md
 releases/*
 !releases/TEMPLATE.md
 
-# Generated audio, stems, MIDI, uploads & calendars
+# Generated audio, stems, MIDI, lyrics, uploads & calendars
 uploads/
 output_midi/
 output_stems/
 output_master/
+output_lyrics/
 *.ics
 *.wav
 *.mp3

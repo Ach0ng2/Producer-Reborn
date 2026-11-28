@@ -40,9 +40,10 @@ Strong hooks typically share 4 traits:
 
 ---
 
-## 4. 6-Point Lyric Revision Checklist
+## 4. 7-Point Lyric Revision Checklist
 
-Before hitting record, run your lyrics through these 6 checks:
+Before hitting record, run your lyrics through these 7 checks:
+- [ ] **Are at least 2–3 distinct senses layered in (e.g., Sight + Kinesthetic/Organic)?** (Replace abstract emotion labels with concrete sensory imagery from the 7-Senses exercise.)
 - [ ] **Does the Chorus summarize the song's core emotion in simple, memorable language?**
 - [ ] **Does Verse 2 add new perspective or story progression**, rather than restating Verse 1?
 - [ ] **Have stale clichés been replaced** with fresher, more personal imagery?

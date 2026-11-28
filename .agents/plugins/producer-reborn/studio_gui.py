@@ -665,6 +665,68 @@ HTML_PAGE = r"""<!DOCTYPE html>
     }
     .dl-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
+    /* Lyric Lab (7-Senses) */
+    .sense-row {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr) 86px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid #181c24;
+    }
+    .sense-row:last-child { border-bottom: none; }
+    .sense-label { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }
+    .sense-hint { font-size: 10.5px; color: var(--muted); }
+    .circle-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 7px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .circle-btn:hover { border-color: var(--border-hi); color: var(--text); }
+    .circle-btn.circled {
+      background: var(--stark);
+      border-color: var(--stark);
+      color: var(--stark-fg);
+      font-weight: 700;
+    }
+    .timer-readout {
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--stark);
+      min-width: 72px;
+    }
+    .textarea-mono {
+      width: 100%;
+      min-height: 180px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      padding: 10px 12px;
+      border-radius: 4px;
+      resize: vertical;
+    }
+    .textarea-mono:focus { outline: none; border-color: var(--stark); }
+    .anchor-pill {
+      background: var(--bg);
+      border: 1px solid var(--border-hi);
+      border-left: 3px solid var(--mint);
+      border-radius: 4px;
+      padding: 7px 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .anchor-tag { font-family: var(--mono); font-size: 10px; color: var(--mint); text-transform: uppercase; }
+
     /* Footer */
     footer {
       border-top: 1px solid var(--border);
@@ -688,6 +750,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
     </div>
     <nav class="nav-tabs">
       <button class="nav-tab active" onclick="switchTab('vibe', this)">Vibe-to-MIDI</button>
+      <button class="nav-tab" onclick="switchTab('lyrics', this)">Lyric Lab</button>
       <button class="nav-tab" onclick="switchTab('song', this)">Song Doctor</button>
       <button class="nav-tab" onclick="switchTab('mix', this)">Mix Doctor</button>
       <button class="nav-tab" onclick="switchTab('master', this)">AI Mastering</button>
@@ -898,7 +961,66 @@ HTML_PAGE = r"""<!DOCTYPE html>
       </div>
     </section>
 
-    <!-- ================= TAB 2: SONG & STEM DOCTOR ================= -->
+    <!-- ================= TAB 2: LYRIC LAB (7-SENSES OBJECT WRITING) ================= -->
+    <section id="pane-lyrics" class="tab-pane">
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Seven-Senses Object Writing • 10-Minute Drill (Show, Don't Tell)</span>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span class="timer-readout" id="lyric-timer">10:00</span>
+            <button class="btn-primary" id="lyric-timer-btn" onclick="toggleLyricTimer()" style="height:30px; padding:0 12px;">▶ Start 10:00</button>
+            <button class="btn-secondary" onclick="resetLyricTimer()" style="height:30px; padding:0 10px;">↺ Reset</button>
+            <button class="btn-secondary" onclick="loadLyricExample()" style="height:30px; padding:0 10px;">Load Example</button>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns: minmax(180px, 0.8fr) minmax(260px, 2fr); gap:10px;">
+          <div class="ctrl-block">
+            <span class="ctrl-label">Track Title</span>
+            <input type="text" class="input-mono" id="lyric-title" placeholder="e.g. Rain on I-40" />
+          </div>
+          <div class="ctrl-block">
+            <span class="ctrl-label">One Specific Moment (Concrete, Not Vague)</span>
+            <input type="text" class="input-mono" id="lyric-moment" placeholder="e.g. Watching them pack the last box at 2 AM — not 'a breakup'" />
+          </div>
+        </div>
+      </div>
+
+      <div class="workspace-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Sensory Brainstorm (Raw Imagery — Ignore Rhyme &amp; Grammar)</span>
+            <span class="panel-meta" id="circled-count">Circled: 0 / 3 target</span>
+          </div>
+          <div id="senses-container"></div>
+        </div>
+
+        <div>
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Circled Chorus Anchors</span>
+              <span class="panel-meta">Top 2–3 Details</span>
+            </div>
+            <div id="chorus-anchors-box" style="margin-bottom:10px; font-size:12px; color:var(--muted);">
+              Circle the 2–3 hardest-hitting senses on the left to build your Chorus hook.
+            </div>
+            <button class="btn-secondary" style="width:100%;" onclick="insertAnchorsToDraft()">↳ Stack Circled Anchors into Draft</button>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Chorus &amp; Verse Draft</span>
+              <span class="panel-meta">lyrics.md</span>
+            </div>
+            <textarea class="textarea-mono" id="lyric-draft" placeholder="[Chorus]&#10;Stack your 2–3 circled sensory anchors here...&#10;&#10;[Verse 1]&#10;Layer the remaining senses to ground the scene..."></textarea>
+            <button class="btn-primary" style="width:100%; margin-top:10px; height:36px;" onclick="saveLyrics(this)">⬇ Save &amp; Download lyrics.md</button>
+            <pre id="out-lyrics" class="console-out"></pre>
+            <div id="dl-lyrics" class="dl-bar"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 3: SONG & STEM DOCTOR ================= -->
     <section id="pane-song" class="tab-pane">
       <div class="panel">
         <div class="panel-header">
@@ -1677,7 +1799,156 @@ function runTimeline(btn) {
   runTool('release_timeline', { title, date }, btn, 'out-tl', 'dl-tl');
 }
 
+// ================= LYRIC LAB (7-SENSES OBJECT WRITING) =================
+const SENSES_DEF = [
+  { id: 'sight', label: '01 SIGHT', hint: 'What you see (colors, posture, light)' },
+  { id: 'hearing', label: '02 HEARING', hint: 'Background music, ambient noise, voice' },
+  { id: 'smell', label: '03 SMELL', hint: 'Air, weather, perfume, smoke' },
+  { id: 'taste', label: '04 TASTE', hint: 'Drinks, salt, bitterness' },
+  { id: 'touch', label: '05 TOUCH', hint: 'Temperature, texture, physical contact' },
+  { id: 'organic', label: '06 ORGANIC', hint: 'Inside body: heart pounding, stomach drop' },
+  { id: 'kinesthetic', label: '07 KINESTHETIC', hint: 'Body motion: pacing, shaking, swaying' }
+];
+const senseValues = {};
+const circledSenses = new Set();
+let lyricSecondsLeft = 600;
+let lyricTimerInterval = null;
+
+function initSensesLab() {
+  const box = document.getElementById('senses-container');
+  box.innerHTML = '';
+  SENSES_DEF.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'sense-row';
+    row.innerHTML = `
+      <div>
+        <div class="sense-label">${s.label}</div>
+        <div class="sense-hint">${s.hint}</div>
+      </div>
+      <input type="text" class="input-mono" id="sense-inp-${s.id}" placeholder="Raw detail..." oninput="senseValues['${s.id}']=this.value; renderCircledAnchors()" />
+      <button class="circle-btn" id="sense-btn-${s.id}" onclick="toggleCircleSense('${s.id}')">★ Circle</button>
+    `;
+    box.appendChild(row);
+  });
+}
+
+function toggleCircleSense(id) {
+  if (circledSenses.has(id)) circledSenses.delete(id);
+  else circledSenses.add(id);
+  const btn = document.getElementById('sense-btn-' + id);
+  btn.classList.toggle('circled', circledSenses.has(id));
+  btn.innerText = circledSenses.has(id) ? '★ Circled' : '★ Circle';
+  renderCircledAnchors();
+}
+
+function renderCircledAnchors() {
+  document.getElementById('circled-count').innerText = `Circled: ${circledSenses.size} / 3 target`;
+  const box = document.getElementById('chorus-anchors-box');
+  if (!circledSenses.size) {
+    box.innerHTML = 'Circle the 2–3 hardest-hitting senses on the left to build your Chorus hook.';
+    return;
+  }
+  box.innerHTML = '';
+  SENSES_DEF.forEach(s => {
+    if (!circledSenses.has(s.id)) return;
+    const val = (document.getElementById('sense-inp-' + s.id).value || '').trim() || '(empty)';
+    const pill = document.createElement('div');
+    pill.className = 'anchor-pill';
+    pill.innerHTML = `<div class="anchor-tag">${s.label}</div><div>${val}</div>`;
+    box.appendChild(pill);
+  });
+}
+
+function insertAnchorsToDraft() {
+  const lines = [];
+  SENSES_DEF.forEach(s => {
+    if (circledSenses.has(s.id)) {
+      const val = (document.getElementById('sense-inp-' + s.id).value || '').trim();
+      if (val) lines.push(`${val}  // [${s.id}]`);
+    }
+  });
+  if (!lines.length) return alert('Circle and fill at least 1 sense first.');
+  const draft = document.getElementById('lyric-draft');
+  const block = `[Chorus Seed]\n${lines.join('\n')}\n`;
+  draft.value = draft.value.trim() ? `${block}\n${draft.value}` : block;
+}
+
+function loadLyricExample() {
+  document.getElementById('lyric-title').value = 'Choosing Texas (Case Study)';
+  document.getElementById('lyric-moment').value = 'Him choosing another woman over her — watching them together';
+  const ex = {
+    sight: 'The smile on his face',
+    hearing: 'Hank tunes, Memphis blues, Amarillo by morning',
+    smell: 'Smoky Mountain rain',
+    taste: 'Drinking Jack alone',
+    touch: 'Putting him back into her arms',
+    organic: 'Crying eastbound, I-40 getting lonelier every mile',
+    kinesthetic: "Him 2-steppin' around the room"
+  };
+  circledSenses.clear();
+  ['sight', 'taste', 'kinesthetic'].forEach(id => circledSenses.add(id));
+  SENSES_DEF.forEach(s => {
+    senseValues[s.id] = ex[s.id];
+    document.getElementById('sense-inp-' + s.id).value = ex[s.id];
+    const btn = document.getElementById('sense-btn-' + s.id);
+    btn.classList.toggle('circled', circledSenses.has(s.id));
+    btn.innerText = circledSenses.has(s.id) ? '★ Circled' : '★ Circle';
+  });
+  renderCircledAnchors();
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(lyricSecondsLeft / 60);
+  const s = lyricSecondsLeft % 60;
+  document.getElementById('lyric-timer').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function toggleLyricTimer() {
+  const btn = document.getElementById('lyric-timer-btn');
+  if (lyricTimerInterval) {
+    clearInterval(lyricTimerInterval);
+    lyricTimerInterval = null;
+    btn.innerText = '▶ Resume';
+    return;
+  }
+  btn.innerText = '⏸ Pause';
+  lyricTimerInterval = setInterval(() => {
+    if (lyricSecondsLeft > 0) {
+      lyricSecondsLeft--;
+      updateTimerDisplay();
+    } else {
+      clearInterval(lyricTimerInterval);
+      lyricTimerInterval = null;
+      btn.innerText = '✓ Done';
+      playMetroClick(ensureTime(), 'downbeat');
+    }
+  }, 1000);
+}
+
+function resetLyricTimer() {
+  if (lyricTimerInterval) { clearInterval(lyricTimerInterval); lyricTimerInterval = null; }
+  lyricSecondsLeft = 600;
+  updateTimerDisplay();
+  document.getElementById('lyric-timer-btn').innerText = '▶ Start 10:00';
+}
+
+function saveLyrics(btn) {
+  const sensesPayload = SENSES_DEF.map(s => ({
+    id: s.id,
+    label: s.label,
+    text: (document.getElementById('sense-inp-' + s.id).value || '').trim(),
+    circled: circledSenses.has(s.id)
+  }));
+  runTool('save_lyrics', {
+    title: document.getElementById('lyric-title').value.trim() || 'Untitled Track',
+    moment: document.getElementById('lyric-moment').value.trim(),
+    senses: sensesPayload,
+    draft: document.getElementById('lyric-draft').value
+  }, btn, 'out-lyrics', 'dl-lyrics');
+}
+
 // Init
+initSensesLab();
 refreshPreview();
 </script>
 </body>
@@ -1915,6 +2186,35 @@ class StudioHandler(BaseHTTPRequestHandler):
                             if url:
                                 downloads.append({"label": fixed_art.name, "url": url})
                 self._send_json(200, {"ok": ok, "output": output, "downloads": downloads})
+                return
+
+            if action == "save_lyrics":
+                title = (params.get("title") or "Untitled Track").strip()
+                moment = (params.get("moment") or "").strip()
+                senses = params.get("senses") or []
+                draft = params.get("draft") or ""
+                slug = "".join(c.lower() if c.isalnum() else "-" for c in title).strip("-") or "track"
+                lyrics_dir = WORKSPACE_ROOT / "output_lyrics"
+                lyrics_dir.mkdir(parents=True, exist_ok=True)
+                out_md = lyrics_dir / f"{slug}_lyrics.md"
+
+                lines = [
+                    f"# {title} — Seven-Senses Lyric Sheet",
+                    "",
+                    f"**Specific Moment:** {moment or '(Not specified)'}",
+                    "",
+                    "## Seven-Senses Object Writing",
+                ]
+                for s in senses:
+                    mark = "★ " if s.get("circled") else ""
+                    lines.append(f"- **{mark}{s.get('label', s.get('id', ''))}:** {s.get('text') or '-'}")
+                lines.extend(["", "## Chorus & Verse Draft", "", draft.strip() or "(Empty draft)", ""])
+                out_md.write_text("\n".join(lines), encoding="utf-8")
+
+                url = to_rel_download(out_md)
+                if url:
+                    downloads.append({"label": out_md.name, "url": url})
+                self._send_json(200, {"ok": True, "output": f"Saved lyric sheet to:\n{out_md}", "downloads": downloads})
                 return
 
             if action == "release_timeline":

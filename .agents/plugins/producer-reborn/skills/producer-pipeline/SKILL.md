@@ -18,7 +18,7 @@ This skill is the unified orchestrator guiding an independent artist from a blan
 ## 7-Phase Production Workflow
 
 ```text
-[Phase 1: Songwriting & Composition] -> Hook craft, structure, voice leading, modal interchange, & genre harmony (skills: songwriting, music-composition)
+[Phase 1: Songwriting & Composition] -> 7-Senses Object Writing (10-min sensory exercise), hook craft, structure, voice leading & genre harmony (skills: songwriting, music-composition)
         ↓
 [Phase 2: Procedural & Synced MIDI]  -> Generate voice-led chords & Euclidean rhythms OR transcribe audio (generate_pattern.py / analyze_audio.py)
         ↓
@@ -66,6 +66,7 @@ releases/<project-slug>/
 - **Content ID Eligible:** NO (Must UNCHECK YouTube Content ID in RouteNote if using non-exclusive loops!)
 
 ## Target Checklist
+- [ ] 7-Senses Object Writing completed (1 concrete moment + 2–3 circled chorus anchors)
 - [ ] Lyrics & Hook finalized
 - [ ] Chords & voice leading drafted (via music-composition or generate_pattern.py)
 - [ ] Beat & chord progression aligned in DAW

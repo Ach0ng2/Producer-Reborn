@@ -18,7 +18,7 @@ Built for independent artists and bedroom producers who work **by ear** rather t
 
 | Phase | Tool / Skill | What It Does |
 | :--- | :--- | :--- |
-| **1. Songwriting & Harmony** | `songwriting` & `music-composition` | Lyric craft, ABABCB structure, hook design, modal interchange, and 24+ genre frameworks. |
+| **1. Songwriting & Harmony** | `songwriting` & `music-composition` | Seven-Senses Object Writing (10-minute sensory exercise), ABABCB structure, hook design, modal interchange, and 24+ genre frameworks. |
 | **2. Vibe-to-MIDI & Audio-to-MIDI** | `generate_pattern.py` & `analyze_audio.py` | Generate voice-led chords, basslines, and Euclidean grooves by mood—or transcribe audio/loops into BPM-synced MIDI via Spotify Basic Pitch (ONNX). |
 | **3. Stem & Pitch Doctor** | `stem_advisor.py` | Splits full tracks with Demucs ONNX (or accepts DAW stems) and flags off-key notes + pYIN vocal pitch drift in cents. |
 | **4. Mix Doctor** | `mix_check.py` | Checks headroom (`-6` to `-3 dBFS`), stereo phase correlation, low-end mono safety (`< 120 Hz`), and 4-band EQ balance vs. a reference track. |
@@ -56,12 +56,13 @@ pip install -r requirements.txt
 - **Windows:** Double-click `Start_Studio.bat`
 - **macOS / Linux:** Run `./Start_Studio.sh`
 
-Your browser opens a minimal, hardware-inspired studio dashboard with 5 drag-and-drop tabs:
-1. **Vibe-to-MIDI** (pick a mood OR write custom chords, choose `4/4` / `3/4` / `6/8` / `5/4` / `7/4`, audition live with the built-in browser Rhodes synth, & download `.mid`)
-2. **Song & Stem Doctor** (drop track $\rightarrow$ BPM, chords & vocal/bass pitch report)
-3. **Mix Doctor** (drop mix $\rightarrow$ headroom, stereo phase & bass mono check)
-4. **AI Mastering** (drop mix + reference $\rightarrow$ download 16-bit RouteNote FLAC)
-5. **RouteNote & Timeline** (auto-fix audio/cover + export `.ics` release calendar)
+Your browser opens a minimal, hardware-inspired studio dashboard with 6 drag-and-drop tabs:
+1. **Vibe-to-MIDI** (pick a mood OR write custom chords, choose `4/4` / `3/4` / `6/8` / `5/4` / `7/4`, audition live with the built-in browser Rhodes synth + metronome + bass/percussion, & download `.mid`)
+2. **Lyric Lab (7-Senses)** (10-minute Object Writing countdown timer, 7-sense sensory grid, circle 2–3 chorus anchors, & export `lyrics.md`)
+3. **Song & Stem Doctor** (drop track $\rightarrow$ BPM, chords & vocal/bass pitch report)
+4. **Mix Doctor** (drop mix $\rightarrow$ headroom, stereo phase & bass mono check)
+5. **AI Mastering** (drop mix + reference $\rightarrow$ download 16-bit RouteNote FLAC)
+6. **RouteNote & Timeline** (auto-fix audio/cover + export `.ics` release calendar)
 
 ### Option B: Antigravity Chat-First (AI Co-Pilot)
 Open this folder in **Antigravity**. The workspace plugin at `.agents/plugins/producer-reborn/` loads automatically. Just drop an audio file or ask in plain language:
